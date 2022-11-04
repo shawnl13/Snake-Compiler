@@ -1,0 +1,4 @@
+def foo1(a, b):
+    a + b
+in
+foo1(1)

@@ -1,0 +1,7 @@
+def max(x,y):
+  let b = x >= y in
+  if b: (x) else: (y)
+in
+let z = max(8, 2) in
+let q = max(3, 10) in
+z * q

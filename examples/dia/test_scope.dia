@@ -1,0 +1,10 @@
+let x = 2 in
+    def foo1(a):
+        a + x
+    and
+    def foo2(b):
+        def foo3(c):
+            c + b
+        in
+        foo3(b)
+    in foo1(x)

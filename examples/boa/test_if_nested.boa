@@ -1,0 +1,12 @@
+let x = if 10:
+          2
+        else:
+          0
+in
+if x:
+  if 2:
+    add1(22)
+  else:
+    sub1(3)
+else:
+  999

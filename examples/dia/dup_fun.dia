@@ -1,0 +1,6 @@
+def foo1(a):
+        a + 3
+    and
+def foo1(b):
+        2
+in foo1(2)

@@ -1,0 +1,5 @@
+let a = 5 in 
+def foo1(a):
+    20
+in 
+foo1(a)

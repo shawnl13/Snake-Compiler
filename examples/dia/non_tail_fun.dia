@@ -1,0 +1,5 @@
+let x = 0 in
+    def foo1(a):
+        a + x
+    in
+foo1(6)
