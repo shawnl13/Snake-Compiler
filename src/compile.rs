@@ -44,12 +44,12 @@ pub enum CompileErr<Span> {
 }
 
 
-
+// vars contains both all function dec and variables
 fn check_prog_helper<'a, Span>(
     p: &'a SurfProg<Span>,
     mut vars: HashSet<String>,
-    mut funs: HashMap<String, usize>,
-) -> (Result<(), CompileErr<Span>>, HashMap<String, usize>)
+    mut funs: HashSet<String>,
+) -> (Result<(), CompileErr<Span>>, HashSet<String>)
 where
     Span: Clone,
 {
@@ -68,6 +68,8 @@ where
         SurfProg::Var(s, ann) => {
             // if varible is not defined, return CompilErr UnboundVariable with useful args
             if vars.contains(s) {
+                return (Ok(()), funs);
+            } else if funs.contains(s) {
                 return (Ok(()), funs);
             } else {
                 /*if (funs.contains_key(s)){
@@ -186,7 +188,7 @@ where
 
                 println!("funs.contains_key(curr_decl) {}", funs.contains_key(&curr_dec.name));*/
 
-                if funs.contains_key(&curr_dec.name) {
+                if funs.contains(&curr_dec.name) {
                     //println!("got true ");
                     return (Err(CompileErr::DuplicateFunName {
                         duplicated_name: curr_dec.name.to_string(),
@@ -208,7 +210,7 @@ where
                         vars.insert(temp);
                         
                     }
-                    funs.insert(curr_dec.name.to_string(), curr_dec.parameters.len());
+                    funs.insert(curr_dec.name.to_string());
                     let (temp_error, temp_funs) = check_prog_helper(&curr_dec.body, vars.clone(), funs);
                     funs = temp_funs;
                     if (temp_error.is_err()) {
@@ -218,11 +220,53 @@ where
             }
             return check_prog_helper(body, vars, funs);
         }
-        SurfProg::Array(vec, ann) => {panic!("nyi::array");}
-        SurfProg::ArraySet{array, index, new_value, ann} => {panic!("nyi::arrayset");}
-        SurfProg::Semicolon{e1, e2, ann} => {panic!("nyi::Semicolon");}
-        SurfProg::Lambda{parameters, body, ann} => {panic!("NYI::Lambda");}
-        SurfProg::MakeClosure{arity, label, env, ann} => {panic!("NYI:MakeClosure");}
+
+        SurfProg::Array(vec, ann) => {
+            for curr_exp in vec{
+                let result;
+                (result, funs) = check_prog_helper(curr_exp, vars.clone(), funs.clone());
+                if (result.is_err()) {return (result, funs);}
+            }
+            return (Ok(()), funs);
+        }
+        SurfProg::ArraySet{array, index, new_value, ann} => {
+            let mut result;
+            (result, funs) = check_prog_helper(array, vars.clone(), funs.clone());
+            if (result.is_err()) {return (result, funs);}
+            (result, funs) = check_prog_helper(index, vars.clone(), funs.clone());
+            if (result.is_err()) {return (result, funs);}
+            (result, funs) = check_prog_helper(new_value, vars.clone(), funs.clone());
+            if (result.is_err()) {return (result, funs);}
+            return (Ok(()), funs);
+
+        }
+        SurfProg::Semicolon{e1, e2, ann} => {
+            let mut result;
+            (result, funs) = check_prog_helper(e1, vars.clone(), funs.clone());
+            if (result.is_err()) {return (result, funs);}
+            (result, funs) = check_prog_helper(e2, vars.clone(), funs.clone());
+            if (result.is_err()) {return (result, funs);}
+            return (Ok(()), funs);
+        }
+        SurfProg::Lambda{parameters, body, ann} => {
+            //panic!("NYI::Lambda");
+            let mut new_vars: HashSet<&String> = HashSet::new();
+            for s in parameters {
+                if new_vars.contains(s) {
+                    return (Err(CompileErr::DuplicateBinding {
+                        duplicated_name: s.to_string(),
+                        location: ann.clone(),
+                    }), funs);
+                } else {
+                    new_vars.insert(s);
+                    vars.insert(s.to_string());
+                }
+            }
+            return check_prog_helper(body, vars, funs);
+        }
+        SurfProg::MakeClosure{arity, label, env, ann} => {
+            return check_prog_helper(env, vars, funs);
+        }
     }
     
 }
@@ -231,8 +275,8 @@ where
 fn check_prog_helper2<'a, Span>(
     p: &'a SurfProg<Span>,
     mut vars: HashSet<String>,
-    mut funs: HashMap<String, usize>,
-) -> (Result<(), CompileErr<Span>>, HashMap<String, usize>)
+    mut funs: HashSet<String>,
+) -> (Result<(), CompileErr<Span>>, HashSet<String>)
 where
     Span: Clone,
 {
@@ -251,6 +295,8 @@ where
         SurfProg::Var(s, ann) => {
             // if varible is not defined, return CompilErr UnboundVariable with useful args
             if vars.contains(s) {
+                return (Ok(()), funs);
+            } else if funs.contains(s){
                 return (Ok(()), funs);
             } else {
                 /*if (funs.contains_key(s)){
@@ -381,7 +427,7 @@ where
                     vars.insert(temp);
                     
                 }
-                funs.insert(curr_dec.name.to_string(), curr_dec.parameters.len());
+                funs.insert(curr_dec.name.to_string());
                 let (temp_error, temp_funs) = check_prog_helper2(&curr_dec.body, vars.clone(), funs);
                 funs = temp_funs;
                 if (temp_error.is_err()) {
@@ -390,11 +436,53 @@ where
             }
             return check_prog_helper2(body, vars, funs);
         }
-        SurfProg::Array(vec, ann) => {panic!("nyi:checkprog2 array");}
-        SurfProg::ArraySet{array, index, new_value, ann} => {panic!("nyi:checkprog2 arrayset");}
-        SurfProg::Semicolon{e1, e2, ann} => {panic!("nyi:checkprog2 Semicolon");}
-        SurfProg::Lambda{parameters, body, ann} => {panic!("NYI:checkprog2 Lambda");}
-        SurfProg::MakeClosure{arity, label, env, ann} => {panic!("NYI:checkprog2 MakeClosure");}
+        
+        SurfProg::Array(vec, ann) => {
+            for curr_exp in vec{
+                let result;
+                (result, funs) = check_prog_helper2(curr_exp, vars.clone(), funs.clone());
+                if (result.is_err()) {return (result, funs);}
+            }
+            return (Ok(()), funs);
+        }
+        SurfProg::ArraySet{array, index, new_value, ann} => {
+            let mut result;
+            (result, funs) = check_prog_helper2(array, vars.clone(), funs.clone());
+            if (result.is_err()) {return (result, funs);}
+            (result, funs) = check_prog_helper2(index, vars.clone(), funs.clone());
+            if (result.is_err()) {return (result, funs);}
+            (result, funs) = check_prog_helper2(new_value, vars.clone(), funs.clone());
+            if (result.is_err()) {return (result, funs);}
+            return (Ok(()), funs);
+
+        }
+        SurfProg::Semicolon{e1, e2, ann} => {
+            let mut result;
+            (result, funs) = check_prog_helper2(e1, vars.clone(), funs.clone());
+            if (result.is_err()) {return (result, funs);}
+            (result, funs) = check_prog_helper2(e2, vars.clone(), funs.clone());
+            if (result.is_err()) {return (result, funs);}
+            return (Ok(()), funs);
+        }
+        SurfProg::Lambda{parameters, body, ann} => {
+            //panic!("NYI::Lambda");
+            let mut new_vars: HashSet<&String> = HashSet::new();
+            for s in parameters {
+                if new_vars.contains(s) {
+                    return (Err(CompileErr::DuplicateBinding {
+                        duplicated_name: s.to_string(),
+                        location: ann.clone(),
+                    }), funs);
+                } else {
+                    new_vars.insert(s);
+                    vars.insert(s.to_string());
+                }
+            }
+            return check_prog_helper2(body, vars, funs);
+        }
+        SurfProg::MakeClosure{arity, label, env, ann} => {
+            return check_prog_helper2(env, vars, funs);
+        }
     }
     
 }
@@ -406,7 +494,7 @@ pub fn check_prog<Span>(p: &SurfProg<Span>) -> Result<(), CompileErr<Span>>
 where
     Span: Clone,
 {
-    let (x, fun_list) = check_prog_helper(p, HashSet::new(), HashMap::new());
+    let (x, fun_list) = check_prog_helper(p, HashSet::new(), HashSet::new());
     if x.is_err() {return x;}
     return check_prog_helper2(p, HashSet::new(), fun_list).0;
 }

@@ -55,7 +55,15 @@ fn sprint_snake_val(x: SnakeVal) -> String {
 
 #[export_name = "\x01print_snake_val"]
 extern "sysv64" fn print_snake_val(v: SnakeVal) -> SnakeVal {
-    panic!("NYI: print_snake_val")
+    if x.0 & INT_TAG == 0 { // it's a number
+        format!("{}", unsigned_to_signed(x.0) >> 1)
+    } else if x == SNAKE_TRU {
+        String::from("true")
+    } else if x == SNAKE_FLS {
+        String::from("false")
+    } else {
+	format!("unimplemented or Invalid snake value 0x{:x}", x.0)
+    }
 }
 
 /* Implement the following error function. You are free to change the
@@ -75,6 +83,17 @@ extern "sysv64" fn snake_error(rdi: u64, rsi: SnakeVal) {
         2 => eprintln!("overflow"),
         3 => eprintln!("if expected a boolean: {}", sprint_snake_val(rsi)),
         4 => eprintln!("logic expected a boolean: {}", sprint_snake_val(rsi)),
+
+        5 => eprintln!("called a non-function: {}", sprint_snake_val(rsi)),
+        6 => eprintln!("wrong number of arguments: {}", sprint_snake_val(rsi)),
+
+        7 => eprintln!("indexed into non-array: {}", sprint_snake_val(rsi)),
+        8 => eprintln!("index not a number: {}", sprint_snake_val(rsi)),
+        9 => eprintln!("index out of bounds: {}", sprint_snake_val(rsi)),
+        10 => eprintln!("length
+        called with non-array: {}", sprint_snake_val(rsi)),
+
+
         _ => eprintln!("Invalid error code: rsi: {}, rdi: {}", sprint_snake_val(rsi), rdi),
     }
 
