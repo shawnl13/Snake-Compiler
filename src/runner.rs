@@ -82,13 +82,13 @@ mod span {
                     location: f(&location),
                 },
 
-                CompileErr::UndefinedFunction {
+                /*CompileErr::UndefinedFunction {
                     undefined,
                     location,
                 } => CompileErr::UndefinedFunction {
                     undefined,
                     location: f(&location),
-                },
+                },*/
 
                 CompileErr::DuplicateArgName {
                     duplicated_name,
@@ -141,12 +141,12 @@ where
             CompileErr::UnboundVariable { unbound, location } => {
                 write!(f, "Unbound variable {} at {}", unbound, location)
             }
-            CompileErr::UndefinedFunction {
+            /*CompileErr::UndefinedFunction {
                 undefined,
                 location,
             } => {
                 write!(f, "Undefined function {} called at {}", undefined, location)
-            }
+            }*/
             CompileErr::DuplicateBinding {
                 duplicated_name,
                 location,

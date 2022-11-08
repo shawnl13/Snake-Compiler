@@ -24,7 +24,10 @@ macro_rules! mk_fail_test {
 
 // egg eater tests
 //mk_test!(egg_interesting, "interesting,egg", 42);
-//mk_test!(egg_other, "egg/other.egg", 2)
+//mk_test!(egg_other, "egg/other.egg", 2);
+mk_test!(egg_apply_to_five, "egg/applyToFive.egg", "6");
+mk_test!(egg_array_simple, "egg/array_simple.egg", "3");
+mk_test!(egg_chain_array_set, "egg/chain_array_set.egg", "0");
 
 
 // diamondback tests

@@ -63,9 +63,22 @@ extern "sysv64" fn print_snake_val(v: SnakeVal) -> SnakeVal {
  *
 **/
 #[export_name = "\x01snake_error"]
-extern "sysv64" fn snake_error() {
+extern "sysv64" fn snake_error(rdi: u64, rsi: SnakeVal) {
     /* */
-    panic!("NYI: snake_error")
+    /* */
+    // rdi: code
+    // rsi: faulty number/bool
+    println!("getting to snake_error");
+    match rdi {
+        0 => eprintln!("arithmetic expected a number: {}", sprint_snake_val(rsi)),
+        1 => eprintln!("comparison expected a number: {}", sprint_snake_val(rsi)),
+        2 => eprintln!("overflow"),
+        3 => eprintln!("if expected a boolean: {}", sprint_snake_val(rsi)),
+        4 => eprintln!("logic expected a boolean: {}", sprint_snake_val(rsi)),
+        _ => eprintln!("Invalid error code: rsi: {}, rdi: {}", sprint_snake_val(rsi), rdi),
+    }
+
+    std::process::exit(1);
 }
 
 /* Implement the following function for checking for equality.
@@ -74,6 +87,10 @@ extern "sysv64" fn snake_error() {
  * you should use *structural* equality.
  *
  * */
+ /* Optionally, Implement the following function for checking for equality.
+ * You may also choose to defined this in assembly code.
+ * */
+
 #[export_name = "\x01snake_equals"]
 extern "sysv64" fn snake_equals() {
     /* */

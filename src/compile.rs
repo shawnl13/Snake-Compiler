@@ -17,10 +17,10 @@ pub enum CompileErr<Span> {
         unbound: String,
         location: Span,
     },
-    UndefinedFunction {
+    /*UndefinedFunction {
         undefined: String,
         location: Span,
-    },
+    },*/
     // The Span here is the Span of the let-expression that has the two duplicated bindings
     DuplicateBinding {
         duplicated_name: String,
@@ -34,7 +34,7 @@ pub enum CompileErr<Span> {
 
     DuplicateFunName {
         duplicated_name: String,
-        location: Span, // the location of the 2nd function
+        location: Span, // the locativarson of the 2nd function
     },
 
     DuplicateArgName {
@@ -70,12 +70,12 @@ where
             if vars.contains(s) {
                 return (Ok(()), funs);
             } else {
-                if (funs.contains_key(s)){
+                /*if (funs.contains_key(s)){
                     return (Err(CompileErr::FunctionUsedAsValue { 
                         function_name: s.to_string(), 
                         location: ann.clone() 
                     }), funs);
-                }
+                }*/
                 return (Err(CompileErr::UnboundVariable {
                     unbound: s.to_string(),
                     location: ann.clone(),
@@ -218,6 +218,11 @@ where
             }
             return check_prog_helper(body, vars, funs);
         }
+        SurfProg::Array(vec, ann) => {panic!("nyi::array");}
+        SurfProg::ArraySet{array, index, new_value, ann} => {panic!("nyi::arrayset");}
+        SurfProg::Semicolon{e1, e2, ann} => {panic!("nyi::Semicolon");}
+        SurfProg::Lambda{parameters, body, ann} => {panic!("NYI::Lambda");}
+        SurfProg::MakeClosure{arity, label, env, ann} => {panic!("NYI:MakeClosure");}
     }
     
 }
@@ -248,12 +253,12 @@ where
             if vars.contains(s) {
                 return (Ok(()), funs);
             } else {
-                if (funs.contains_key(s)){
+                /*if (funs.contains_key(s)){
                     return (Err(CompileErr::FunctionUsedAsValue { 
                         function_name: s.to_string(), 
                         location: ann.clone() 
                     }), funs);
-                }
+                }*/
                 return (Err(CompileErr::UnboundVariable {
                     unbound: s.to_string(),
                     location: ann.clone(),
@@ -339,37 +344,23 @@ where
             return (Ok(()), funs);
         }
         SurfProg::Call(fun, args, ann) => {
+            panic!("NYI: checkprog2 call");
             // returns errors: FunctionCalledWrongArity, ValueUsedAsFunction, UndefinedFunction
-            let cur_num_args = args.len();
-            if ((!funs.contains_key(fun))&&vars.contains(fun)) {
-                //ValueUsedAsFunction
-                return (Err(CompileErr::ValueUsedAsFunction { 
-                    variable_name: fun.to_string(), 
-                    location: ann.clone(), 
-                }),funs);
-            } else if ((!funs.contains_key(fun))&&!vars.contains(fun)) {
+            /*let cur_num_args = args.len();
+            
+            if ((!funs.contains_key(fun))&&!vars.contains(fun)) {
                 //UndefinedFunction
                 return (Err(CompileErr::UndefinedFunction {
                     undefined: fun.to_string(), 
                     location: ann.clone(), 
                 }),funs);
-            } else {
-                //check args
-                if (*funs.get(fun).unwrap()!=cur_num_args){
-                    return (Err(CompileErr::FunctionCalledWrongArity { 
-                        function_name: fun.to_string(), 
-                        correct_arity: *funs.get(fun).unwrap(), 
-                        arity_used: cur_num_args, 
-                        location: ann.clone(),
-                    }),funs);
-                } 
-            }
+            } 
             for cur_arg in args {
                 let (temp, funs_temp) = check_prog_helper2(cur_arg, vars.clone(), funs);
                 funs = funs_temp;
                 if temp.is_err() { return (temp, funs); }
             }
-            return (Ok(()), funs);
+            return (Ok(()), funs);*/
         }
 
         SurfProg::FunDefs { decls, body, ann } => {
@@ -399,6 +390,11 @@ where
             }
             return check_prog_helper2(body, vars, funs);
         }
+        SurfProg::Array(vec, ann) => {panic!("nyi:checkprog2 array");}
+        SurfProg::ArraySet{array, index, new_value, ann} => {panic!("nyi:checkprog2 arrayset");}
+        SurfProg::Semicolon{e1, e2, ann} => {panic!("nyi:checkprog2 Semicolon");}
+        SurfProg::Lambda{parameters, body, ann} => {panic!("NYI:checkprog2 Lambda");}
+        SurfProg::MakeClosure{arity, label, env, ann} => {panic!("NYI:checkprog2 MakeClosure");}
     }
     
 }
@@ -502,15 +498,21 @@ fn uni_helper(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
 
         },
         Exp::Call(s, a, _) => {
+            panic!("nyi uni_helper call");
 
-            let mut new_parameters:Vec<Exp<()>> = Vec::new();
+            /*let mut new_parameters:Vec<Exp<()>> = Vec::new();
             for cur_p in a{
                 let renamed_para;
                 (renamed_para, new_funs) = uni_helper(cur_p, new_vars.clone(), new_funs, count);
                 new_parameters.push(renamed_para);
             }
-            return (Exp::Call(s.to_string(), new_parameters, ()), new_funs);
+            return (Exp::Call(*s, new_parameters, ()), new_funs);*/
         }
+        Exp::Array(vec, ann) => {panic!("nyi:uni_helper array");}
+        Exp::ArraySet{array, index, new_value, ann} => {panic!("nyi:uni_helper arrayset");}
+        Exp::Semicolon{e1, e2, ann} => {panic!("nyi:uni_helper Semicolon");}
+        Exp::Lambda{parameters, body, ann} => {panic!("NYI:uni_helper Lambda");}
+        Exp::MakeClosure{arity, label, env, ann} => {panic!("NYI:uni_helper MakeClosure");}
     }
 
 }
@@ -555,8 +557,13 @@ fn uni_fix_calls(e: &Exp<()>, new_funs: HashMap<String,String>) -> Exp<()>{
                 }
             return Exp::FunDefs { decls: new_declarations, body: Box::new(uni_fix_calls(body, new_funs.clone())), ann: () };
         },
+        Exp::Call(fun, args, _) => {panic!("nyi:uni_fix_calls call");} //return Exp::Call(new_funs.get(fun).unwrap().to_string(), args.clone(), ()),
 
-        Exp::Call(fun, args, _) => return Exp::Call(new_funs.get(fun).unwrap().to_string(), args.clone(), ()),
+        Exp::Array(vec, ann) => {panic!("nyi:uni_fix_calls array");}
+        Exp::ArraySet{array, index, new_value, ann} => {panic!("nyi:uni_fix_calls arrayset");}
+        Exp::Semicolon{e1, e2, ann} => {panic!("nyi:uni_fix_calls Semicolon");}
+        Exp::Lambda{parameters, body, ann} => {panic!("NYI:uni_fix_calls Lambda");}
+        Exp::MakeClosure{arity, label, env, ann} => {panic!("NYI:uni_fix_calls MakeClosure");}
     }
     
 }
@@ -688,11 +695,17 @@ fn lift_create_hashset<ann>(p: Exp<ann>, mut env: Vec<String>, mut func_param: H
             return lift_create_hashset(*body, env, func_param);
         },
         Exp::Call(_, para, _) => {
-            for e in para{
+            panic!("NYI: lift_create_hashset call");
+            /*for e in para{
                 func_param = lift_create_hashset(e,env.clone(), func_param.clone());
             }
-            return func_param;
+            return func_param;*/
         },
+        Exp::Array(vec, ann) => {panic!("nyi:lift_create_hashset array");}
+        Exp::ArraySet{array, index, new_value, ann} => {panic!("nyi:lift_create_hashset arrayset");}
+        Exp::Semicolon{e1, e2, ann} => {panic!("nyi:lift_create_hashset Semicolon");}
+        Exp::Lambda{parameters, body, ann} => {panic!("NYI:lift_create_hashset Lambda");}
+        Exp::MakeClosure{arity, label, env, ann} => {panic!("NYI:lift_create_hashset MakeClosure");}
     } 
 }
 
@@ -759,8 +772,9 @@ fn lift_replace_func_call<ann: Clone>(p: Exp<ann>, mut func_param: HashMap<Strin
             }
         },
         Exp::Call(fun, parameters, ann) => {
+            panic!("NYI:: Lift part 2 call");
             let mut new_para:Vec<Exp<ann>> = Vec::new();
-            for p in parameters{
+            /*for p in parameters{
                 new_para.push(lift_replace_func_call(p, func_param.clone()));
             }
             for p in func_param.get(&fun).unwrap().clone(){
@@ -768,8 +782,14 @@ fn lift_replace_func_call<ann: Clone>(p: Exp<ann>, mut func_param: HashMap<Strin
             }
          //   let tmp = Exp::Var(&mut func_param.get(&fun).unwrap().clone(), ann);
           //  new_para.append();
-            return Exp::Call(fun, new_para, ann);
+            return Exp::Call(fun, new_para, ann);*/
+            
         },
+        Exp::Array(vec, ann) => {panic!("nyi:lift_replace_func_call array");}
+        Exp::ArraySet{array, index, new_value, ann} => {panic!("nyi:lift_replace_func_call arrayset");}
+        Exp::Semicolon{e1, e2, ann} => {panic!("nyi:lift_replace_func_call Semicolon");}
+        Exp::Lambda{parameters, body, ann} => {panic!("NYI:lift_replace_func_call Lambda");}
+        Exp::MakeClosure{arity, label, env, ann} => {panic!("NYI:lift_replace_func_call MakeClosure");}
     }
 }
 
@@ -822,14 +842,20 @@ fn lift_top_level<ann>(p: Exp<ann>, mut funs: Vec<FunDecl<Exp<()>, ()>>) -> (Vec
         },
 
         Exp::Call(fun, args, _) => {
+            panic!("NYI: call lift_top_level");/*
             let mut recursed_args:Vec<Exp<()>> = Vec::new();
             for a in args {
                 let tmp;
                 (funs, tmp) = lift_top_level(a, funs);
                 recursed_args.push(tmp);
             }
-            return (funs, Exp::Call(fun, recursed_args, ()));
+            return (funs, Exp::Call(fun, recursed_args, ()));*/
         },
+        Exp::Array(vec, ann) => {panic!("nyi:lift_top_level array");}
+        Exp::ArraySet{array, index, new_value, ann} => {panic!("nyi:lift_top_level arrayset");}
+        Exp::Semicolon{e1, e2, ann} => {panic!("nyi:lift_top_level Semicolon");}
+        Exp::Lambda{parameters, body, ann} => {panic!("NYI:lift_top_level Lambda");}
+        Exp::MakeClosure{arity, label, env, ann} => {panic!("NYI:lift_top_level MakeClosure");}
     }
 }
 
@@ -1240,6 +1266,8 @@ fn sequentialize_helper(e: &Exp<u32>) -> SeqExp<()> {
         }
         Exp::FunDefs { decls, body, ann } => {panic!("Tried to sequentialize a function definition")},
         Exp::Call(s, parameters, ann) => {
+            panic!("NYI: call sequentialize_helper");
+            /* 
             /* check if all parameters are  immediate
              if they are all immediate, return seq::call(s, )
 
@@ -1297,8 +1325,13 @@ fn sequentialize_helper(e: &Exp<u32>) -> SeqExp<()> {
                 };
             }
 
-            return out;
+            return out;*/
         }
+        Exp::Array(vec, ann) => {panic!("nyi:sequentialize_helper array");}
+        Exp::ArraySet{array, index, new_value, ann} => {panic!("nyi:sequentialize_helper arrayset");}
+        Exp::Semicolon{e1, e2, ann} => {panic!("nyi:sequentialize_helper Semicolon");}
+        Exp::Lambda{parameters, body, ann} => {panic!("NYI:sequentialize_helper Lambda");}
+        Exp::MakeClosure{arity, label, env, ann} => {panic!("NYI:sequentialize_helper MakeClosure");}
     }
 }
 #[cfg(test)]
@@ -1366,9 +1399,12 @@ fn space_needed<Ann>(e: &SeqExp<Ann>) -> i32 {
         SeqExp::If{ cond: _con, thn: then, els: els, ann: _ann } => {
             return space_needed(then) + space_needed(els);
         },
-        SeqExp::Call(S, parameters,_ann ) =>{
-            return 0;
-        }
+
+        
+        SeqExp::Array(vec, ann) => {return 1;}
+        SeqExp::ArraySet{array, index, new_value, ann} => {return 0;}
+        SeqExp::CallClosure { fun, args, ann } =>{panic!("nyi space needed callclosure");}
+        SeqExp::MakeClosure{arity, label, env, ann} => {panic!("NYI:sequentialize_helper MakeClosure");}
     }
     //panic!("NYI: space_needed")
 }
@@ -1380,7 +1416,7 @@ fn arith_number_err(reg_to_check: Reg) -> Vec<Instr> {
     let mut instructions = Vec::new();
     instructions.push(Instr::Test(BinArgs::ToReg(reg_to_check, Arg32::Unsigned(1))));
     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rsi, Arg64::Reg(reg_to_check))));
-    instructions.push(Instr::Jnz("error_arith_number".to_string()));
+    instructions.push(Instr::Jnz(JmpArg::Label("error_arith_number".to_string())));
     return instructions;
 }
 
@@ -1390,7 +1426,7 @@ fn compare_number_err(reg_to_check: Reg) -> Vec<Instr> {
     let mut instructions = Vec::new();
     instructions.push(Instr::Test(BinArgs::ToReg(reg_to_check, Arg32::Unsigned(1))));
     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rsi, Arg64::Reg(reg_to_check))));
-    instructions.push(Instr::Jnz("error_compare_number".to_string()));
+    instructions.push(Instr::Jnz(JmpArg::Label("error_compare_number".to_string())));
     return instructions;
 }
 
@@ -1402,7 +1438,7 @@ fn logic_bool_err(reg_to_check: Reg) -> Vec<Instr> {
     let mut instructions = Vec::new();
     instructions.push(Instr::Test(BinArgs::ToReg(reg_to_check, Arg32::Unsigned(1))));
     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rsi, Arg64::Reg(reg_to_check))));
-    instructions.push(Instr::Jz("error_logic_bool".to_string()));
+    instructions.push(Instr::Jz(JmpArg::Label("error_logic_bool".to_string())));
     return instructions;
 }
 
@@ -1413,7 +1449,7 @@ fn if_bool_err(reg_to_check: Reg) -> Vec<Instr> {
     let mut instructions = Vec::new();
     instructions.push(Instr::Test(BinArgs::ToReg(reg_to_check, Arg32::Unsigned(1))));
     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rsi, Arg64::Reg(reg_to_check))));
-    instructions.push(Instr::Jz("error_if_bool".to_string()));
+    instructions.push(Instr::Jz(JmpArg::Label("error_if_bool".to_string())));
     return instructions;
 }
 
@@ -1422,8 +1458,8 @@ fn if_bool_err(reg_to_check: Reg) -> Vec<Instr> {
 // RDI, RSI, RDX, RCX, R8, and R9 are System V AMD64 ABI arguments (rust calls)
 // Rax: everywhere, used to compute and return
 // R15: overwritten by prim2 and if
-// R14: overwritten by prim1::not // co
-// R10: overwritten in non-tail calls for debugging only
+// R14: overwritten by prim1::not // could be replaced by r15
+// R10: overwritten in non-tail calls for debugging only // could be removed
 // Rdi: error codes in rust calls
 // Rsi: error faulty value in rust calls
 fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:bool) -> Vec<Instr> {
@@ -1474,7 +1510,7 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                     let calculated_offset:i32 = -8 * usize_to_i32(count);
                     let address = MemRef{
                         reg: Reg::Rsp,
-                        offset: calculated_offset,
+                        offset: Offset::Constant(calculated_offset),
                     };
                     // store 32 representation from mem into rax
                     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Mem(address))));
@@ -1522,7 +1558,7 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                     instructions.append(&mut arith_number_err(Reg::Rax));
 
                     instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rax, Arg32::Signed(2))));
-                    instructions.push(Instr::Jo(("overflow".to_string())));
+                    instructions.push(Instr::Jo(JmpArg::Label("overflow".to_string())));
                 },
 
                 Prim1::Sub1 => { 
@@ -1532,15 +1568,15 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                     // jnz error_not_number         ;; if the bit is set, go to some centralized error handler
                     instructions.append(&mut arith_number_err(Reg::Rax));
                     instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rax, Arg32::Signed(2))));
-                    instructions.push(Instr::Jo(("overflow".to_string())));
+                    instructions.push(Instr::Jo(JmpArg::Label("overflow".to_string())));
                 }
 
                 Prim1::IsBool =>{ // if rax is a bool, store true in rax, else store false
                     instructions.push(Instr::Test(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(1))));
-                    instructions.push(Instr::Jz(is_num.clone())); // zero means rax is a number
+                    instructions.push(Instr::Jz(JmpArg::Label(is_num.clone()))); // zero means rax is a number
                     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Unsigned(utrue))));
                      //not a number
-                    instructions.push(Instr::Jmp(done_lab.clone()));
+                    instructions.push(Instr::Jmp(JmpArg::Label(done_lab.clone())));
 
                     instructions.push(Instr::Label(is_num.clone()));
                     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Unsigned(ufalse)))); // is a number
@@ -1551,10 +1587,10 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                 Prim1::IsNum =>{ // if rax is a number, store true in rax else store false
                     // IsNum(RAX)
                     instructions.push(Instr::Test(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(1))));
-                    instructions.push(Instr::Jz(is_num.clone())); // zero means rax is a number
+                    instructions.push(Instr::Jz(JmpArg::Label(is_num.clone()))); // zero means rax is a number
 
                     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Unsigned(ufalse))));
-                    instructions.push(Instr::Jmp(done_lab.clone()));
+                    instructions.push(Instr::Jmp(JmpArg::Label(done_lab.clone())));
 
                     instructions.push(Instr::Label(is_num.clone()));
                     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Unsigned(utrue))));
@@ -1589,10 +1625,14 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                     max_space_needed = max_space_needed * 8;
 
                     instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
-                    instructions.push(Instr::Call("print_snake_val".to_string()));
+                    instructions.push(Instr::Call(JmpArg::Label("print_snake_val".to_string())));
                     instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
 
                 }
+                Prim1::Length => todo!(),
+                Prim1::IsArray => todo!(),
+                Prim1::IsFun => todo!(),
+                
             }
         }
 
@@ -1627,19 +1667,19 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                     instructions.append(&mut arith_number_err(Reg::Rax));
                     instructions.append(&mut arith_number_err(Reg::R15));
                     instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::R15))));
-                    instructions.push(Instr::Jo(("overflow".to_string())));
+                    instructions.push(Instr::Jo(JmpArg::Label("overflow".to_string())));
                 }
                 Prim2::Sub => {
                     instructions.append(&mut arith_number_err(Reg::Rax));
                     instructions.append(&mut arith_number_err(Reg::R15));
                     instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::R15))));
-                    instructions.push(Instr::Jo(("overflow".to_string())));
+                    instructions.push(Instr::Jo(JmpArg::Label("overflow".to_string())));
                 }
                 Prim2::Mul => {
                     instructions.append(&mut arith_number_err(Reg::Rax));
                     instructions.append(&mut arith_number_err(Reg::R15));
                     instructions.push(Instr::IMul(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::R15))));
-                    instructions.push(Instr::Jo(("overflow".to_string())));
+                    instructions.push(Instr::Jo(JmpArg::Label("overflow".to_string())));
                     instructions.push(Instr::Sar(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(1))));
                     
                 }
@@ -1659,12 +1699,12 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                     instructions.append(&mut compare_number_err(Reg::R15));
 
                     instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::R15))));
-                    instructions.push(Instr::Jl(is_true.clone()));
+                    instructions.push(Instr::Jl(JmpArg::Label(is_true.clone())));
 
                     instructions.push(Instr::Mov(
                         MovArgs::ToReg(Reg::Rax, Arg64::Unsigned(ufalse),
                     )));
-                    instructions.push(Instr::Jmp(done_lab.clone()));
+                    instructions.push(Instr::Jmp(JmpArg::Label(done_lab.clone())));
 
                     instructions.push(Instr::Label(is_true.clone()));
                     instructions.push(Instr::Mov(
@@ -1679,12 +1719,12 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                     instructions.append(&mut compare_number_err(Reg::R15));
                     
                     instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::R15))));
-                    instructions.push(Instr::Jg(is_true.clone()));
+                    instructions.push(Instr::Jg(JmpArg::Label(is_true.clone())));
 
                     instructions.push(Instr::Mov(
                         MovArgs::ToReg(Reg::Rax, Arg64::Unsigned(ufalse),
                     )));
-                    instructions.push(Instr::Jmp(done_lab.clone()));
+                    instructions.push(Instr::Jmp(JmpArg::Label(done_lab.clone())));
 
                     instructions.push(Instr::Label(is_true.clone()));
                     instructions.push(Instr::Mov(
@@ -1698,12 +1738,12 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                     instructions.append(&mut compare_number_err(Reg::R15));
 
                     instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::R15))));
-                    instructions.push(Instr::Jle(is_true.clone()));
+                    instructions.push(Instr::Jle(JmpArg::Label(is_true.clone())));
 
                     instructions.push(Instr::Mov(
                         MovArgs::ToReg(Reg::Rax, Arg64::Unsigned(ufalse),
                     )));
-                    instructions.push(Instr::Jmp(done_lab.clone()));
+                    instructions.push(Instr::Jmp(JmpArg::Label(done_lab.clone())));
 
                     instructions.push(Instr::Label(is_true.clone()));
                     instructions.push(Instr::Mov(
@@ -1719,12 +1759,12 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                     instructions.append(&mut compare_number_err(Reg::R15));
 
                     instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::R15))));
-                    instructions.push(Instr::Jge(is_true.clone()));
+                    instructions.push(Instr::Jge(JmpArg::Label(is_true.clone())));
 
                     instructions.push(Instr::Mov(
                         MovArgs::ToReg(Reg::Rax, Arg64::Unsigned(ufalse),
                     )));
-                    instructions.push(Instr::Jmp(done_lab.clone()));
+                    instructions.push(Instr::Jmp(JmpArg::Label(done_lab.clone())));
 
                     instructions.push(Instr::Label(is_true.clone()));
                     instructions.push(Instr::Mov(
@@ -1737,12 +1777,12 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                 Prim2::Eq => {
                     
                     instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::R15))));
-                    instructions.push(Instr::Je(is_true.clone()));
+                    instructions.push(Instr::Je(JmpArg::Label(is_true.clone())));
 
                     instructions.push(Instr::Mov(
                         MovArgs::ToReg(Reg::Rax, Arg64::Unsigned(ufalse),
                     )));
-                    instructions.push(Instr::Jmp(done_lab.clone()));
+                    instructions.push(Instr::Jmp(JmpArg::Label(done_lab.clone())));
 
                     instructions.push(Instr::Label(is_true.clone()));
                     instructions.push(Instr::Mov(
@@ -1751,6 +1791,8 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
 
                     instructions.push(Instr::Label(done_lab.clone()));
                 }
+                Prim2::Neq => todo!(),
+                Prim2::ArrayGet => todo!(),
             }
             
         } 
@@ -1766,7 +1808,7 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
             //mov rax to mem
             let address = MemRef{
                 reg: Reg::Rsp,
-                offset: -8 * usize_to_i32(env.len()),
+                offset: Offset::Constant(-8 * usize_to_i32(env.len())),
             };
 
             instructions.push(Instr::Mov(MovArgs::ToMem(address ,Reg32::Reg(Reg::Rax))));
@@ -1791,13 +1833,13 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
             instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::R15))));
 
             // if not equal jump to the else label
-            instructions.push(Instr::Jne(else_lab.clone()));
+            instructions.push(Instr::Jne(JmpArg::Label(else_lab.clone())));
 
             // then instrutions
             instructions.append(&mut compile_to_instrs_helper(thn, env.clone(), is_tail));
 
             // jump to end (to avoid executing both then and else)
-            instructions.push(Instr::Jmp(done_lab.clone()));
+            instructions.push(Instr::Jmp(JmpArg::Label(done_lab.clone())));
 
             // set label for else condion
             instructions.push(Instr::Label(else_lab.clone()));
@@ -1808,9 +1850,9 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
             // set label for done 
             instructions.push(Instr::Label(done_lab.clone()));
         }
-        SeqExp::Call(fun, args, ann) => {
-            //panic!("NYI::call");
-
+        SeqExp::CallClosure{fun, args, ann} => {
+            panic!("NYI::call");
+            /*
             // if it is a tail call:
             if (is_tail){
                 // Store each parameter into rsp-8, rsp-16, ...
@@ -1863,8 +1905,11 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
 
                 // decrement rsp by space_needed
                 instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(space_needed))));
-            }
+            }*/
         }
+        SeqExp::ArraySet { array, index, new_value, ann } => todo!(),
+        SeqExp::Array(_, _) => todo!(),
+        SeqExp::MakeClosure { arity, label, env, ann } => todo!(),
     }
     return instructions;
 }
@@ -1881,7 +1926,7 @@ fn compile_to_instr_functions(funcs:Vec<FunDecl<SeqExp<u32>, u32>>, e: &SeqExp<u
   //  println!("Space needed is {}", max_space_needed);
   //  println!("instructions: {}", instrs_to_string(&instructions));
     // unconditional jump to end of program label
-    instructions.push(Instr::Jmp("End".to_string()));
+    instructions.push(Instr::Jmp(JmpArg::Label("End".to_string())));
 
     for f in funcs{
 
@@ -1908,7 +1953,7 @@ fn compile_to_instr_functions(funcs:Vec<FunDecl<SeqExp<u32>, u32>>, e: &SeqExp<u
     //todo: put any arguments needed into registers/memory
     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rdi, Arg64::Unsigned(0))));
     instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
-    instructions.push(Instr::Call("snake_error".to_string()));
+    instructions.push(Instr::Call(JmpArg::Label("snake_error".to_string())));
     // should be inc
     instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
     //instructions.push(Instr::Jmp("End".to_string()));
@@ -1916,14 +1961,14 @@ fn compile_to_instr_functions(funcs:Vec<FunDecl<SeqExp<u32>, u32>>, e: &SeqExp<u
     instructions.push(Instr::Label("error_compare_number".to_string()));
     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rdi, Arg64::Unsigned(1))));
     instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
-    instructions.push(Instr::Call("snake_error".to_string()));
+    instructions.push(Instr::Call(JmpArg::Label("snake_error".to_string())));
     instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
 
 
     instructions.push(Instr::Label("error_if_bool".to_string()));
     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rdi, Arg64::Unsigned(3))));
     instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
-    instructions.push(Instr::Call("snake_error".to_string()));
+    instructions.push(Instr::Call(JmpArg::Label("snake_error".to_string())));
     instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
 
 
@@ -1931,7 +1976,7 @@ fn compile_to_instr_functions(funcs:Vec<FunDecl<SeqExp<u32>, u32>>, e: &SeqExp<u
     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rdi, Arg64::Unsigned(4))));
     instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
     // call rust function
-    instructions.push(Instr::Call("snake_error".to_string()));
+    instructions.push(Instr::Call(JmpArg::Label("snake_error".to_string())));
     // should be inc
     instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
 
@@ -1943,7 +1988,7 @@ fn compile_to_instr_functions(funcs:Vec<FunDecl<SeqExp<u32>, u32>>, e: &SeqExp<u
     // should be dec
     instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
     // call rust function
-    instructions.push(Instr::Call("snake_error".to_string()));
+    instructions.push(Instr::Call(JmpArg::Label("snake_error".to_string())));
     // should be inc
     instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
 
@@ -1985,5 +2030,14 @@ where
     // then sequentialize
     let seq_p = tag_sprog(&sequentialize_program(&t_defs, &t_main));
     // then codegen
-    panic!("NYI: code generation")
+    let is = compile_to_instrs(&seq_p);
+    return Ok(format!(
+        "\
+        section .text
+        global start_here
+        extern snake_error
+        extern print_snake_val
+start_here:
+{}       
+",instrs_to_string(&is)));
 }
