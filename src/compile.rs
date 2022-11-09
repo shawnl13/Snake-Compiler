@@ -1079,7 +1079,8 @@ mod check_uniquify_test {
 
 
 //1 make hashtable of all variables in outer scope (excluding pre existing parameters)
-fn lift_create_hashmap<ann>(p: Exp<ann>, mut env: Vec<String>, mut func_param: HashMap<String, Vec<String>>) -> HashMap<String, Vec<String>> {
+fn lift_create_hashmap<ann>(p: Exp<ann>, mut env: Vec<String>, mut func_param: HashMap<String, (usize,Vec<String>)>) 
+-> HashMap<String, (usize, Vec<String>)> {
     match p{
         Exp::Num(_, _) => return func_param,
         Exp::Bool(_, _) => return func_param,
@@ -1109,7 +1110,7 @@ fn lift_create_hashmap<ann>(p: Exp<ann>, mut env: Vec<String>, mut func_param: H
         },
         Exp::FunDefs { decls, body, ann } =>{
             for curr_decl in decls{
-                func_param.insert(curr_decl.name, env.clone());
+                func_param.insert(curr_decl.name, (curr_decl.parameters.len() ,env.clone()));
 
                 let mut env_inner = env.clone();
                 env_inner.append(&mut curr_decl.parameters.clone());
@@ -1139,7 +1140,8 @@ fn lift_optimize<ann>(p: Exp<ann>, mut func_param: HashMap<String, Vec<String>>)
 }
 
 //2 use hashtable to add needed parameters to definitions and calls
-fn lift_replace_func_call_old<ann: Clone>(p: Exp<ann>, mut func_param: HashMap<String, Vec<String>>)-> Exp<ann>{
+/*
+fn lift_replace_func_call_old<ann: Clone + std::marker::Copy + std::fmt::Display>(p: Exp<ann>, mut func_param: HashMap<String, Vec<String>>)-> Exp<ann>{
     match p {
         Exp::Num(_, _) => return p,
         Exp::Bool(_, _) => return p,
@@ -1215,7 +1217,7 @@ fn lift_replace_func_call_old<ann: Clone>(p: Exp<ann>, mut func_param: HashMap<S
         Exp::Lambda{parameters, body, ann} => {panic!("NYI:lift_replace_func_call Lambda");}
         Exp::MakeClosure{arity, label, env, ann} => {panic!("NYI:lift_replace_func_call MakeClosure");}
     }
-}
+}*/
 
 //3 lift definitions to the top level
 fn lift_top_level<ann>(p: Exp<ann>, mut funs: Vec<FunDecl<Exp<()>, ()>>) -> (Vec<FunDecl<Exp<()>, ()>>, Exp<()>) {
@@ -1284,7 +1286,7 @@ fn lift_top_level<ann>(p: Exp<ann>, mut funs: Vec<FunDecl<Exp<()>, ()>>) -> (Vec
 }
 
 //1.1 convert let lambdas to def let lambda
-fn lift_convert_lambdas<ann>(e: Exp<ann>) -> Exp<ann> {
+fn lift_convert_lambdas<ann: std::fmt::Display + std::marker::Copy>(e: Exp<ann>) -> Exp<ann> {
     match e {
         Exp::Num(_, _) => return e,
         Exp::Bool(_, _) => return e,
@@ -1359,12 +1361,12 @@ fn lift_convert_lambdas<ann>(e: Exp<ann>) -> Exp<ann> {
         //1.1 convert let lambdas to let def
         // (lambda x: x + 1 end) -> def lambda_1(x): x + 1 in lambda_1
         Exp::Lambda{parameters, body, ann} => {
-            let name = format!("Lambda_({})", parameters.join(", "));
+            let name = format!("Lambda{}_({})", ann, parameters.join(", "));
             let new_decl = FunDecl { 
-                name: name, 
+                name: name.to_string(), 
                 parameters: parameters, 
-                body: Exp::Var(name, ann), 
-                ann: ann 
+                body: Exp::Var(name.clone(), ann), 
+                ann: ann
             };
             return Exp::FunDefs { decls: vec![new_decl], body: body, ann: ann };
         }
@@ -1376,8 +1378,120 @@ fn lift_convert_lambdas<ann>(e: Exp<ann>) -> Exp<ann> {
     return e;
 }
 
+//1.2 replace def(params) {body} with def(env_array, params) {let env1=env_aray[1], env2 ... in body}
+fn lift_replace_def_params<ann: std::marker::Copy>(e: Exp<ann>, func_param: HashMap<String, (usize, Vec<String>)> ) -> Exp<ann> {
+    match e {
+        Exp::Num(_, _) => return e,
+        Exp::Bool(_, _) => return e,
+        Exp::Var(_, _) => return e,
+        Exp::Prim1(op, exp1, ann) => {
+            return Exp::Prim1(op, Box::new(lift_replace_def_params(*exp1, func_param)), ann);        
+        },
+        Exp::Prim2(op, exp1, exp2, ann) => {
+            return Exp::Prim2(op,
+            Box::new(lift_replace_def_params(*exp1, func_param.clone())),
+            Box::new(lift_replace_def_params(*exp2, func_param.clone())),
+            ann
+            );
+        },
+        Exp::Let { bindings, body, ann } => {
+            let mut new_binds = Vec::new();            
+            for binding in bindings{
+                new_binds.push((binding.0, lift_replace_def_params(binding.1, func_param.clone())));            
+            }
+
+            return Exp::Let { 
+                bindings: new_binds, 
+                body: Box::new(lift_replace_def_params(*body, func_param)), 
+                ann: ann }
+        },
+        Exp::If { cond, thn, els, ann } => {
+            let (c,t,e);
+            c = Box::new(lift_replace_def_params(*cond, func_param.clone()));
+            t = Box::new(lift_replace_def_params(*thn, func_param.clone()));
+            e = Box::new(lift_replace_def_params(*els, func_param.clone()));
+            return Exp::If { cond: c, thn: t, els: e, ann: ann };
+        },
+        Exp::FunDefs { decls, body, ann } => {
+            let mut new_decls:Vec<FunDecl<Exp<ann>, ann>> = Vec::new();
+            for d in decls {
+                let old_body = lift_replace_def_params(d.body, func_param.clone());
+                let mut bindings = Vec::new();
+                let env = &func_param.get(&d.name.to_string()).unwrap().1; // env = [x1,x2,x3,f,g]
+
+                let array_name = "env".to_string();
+                                
+                let mut i = 0 as i64;
+                for curr_param in env{
+
+                    let new_binding = (curr_param.to_string(), Exp::Prim2(
+                        Prim2::ArrayGet, 
+                        Box::new(Exp::Var(array_name.to_string(), ann)), 
+                        Box::new(Exp::Num(i, ann)), 
+                        ann));
+                    i +=1;
+                    bindings.push(new_binding);
+                }
+
+                let new_body = Exp::Let { bindings: bindings, body: Box::new(old_body), ann: ann };
+
+                let mut parameters = Vec::new(); // array_name + d.param
+                parameters.push(array_name.to_string());
+                parameters.append(&mut d.parameters.clone());
+
+                new_decls.push(FunDecl { 
+                    name: d.name, 
+                    parameters: parameters, 
+                    body: new_body, 
+                    ann: d.ann });
+            }
+            return Exp::FunDefs { decls: new_decls, body: Box::new(lift_replace_def_params(*body, func_param)), ann: ann };
+        },
+        Exp::Call(fun, parameters, ann) => {
+            let new_fun = lift_replace_def_params(*fun, func_param.clone());
+            let mut new_para:Vec<Exp<ann>> = Vec::new();
+            for p in parameters{
+                new_para.push(lift_replace_def_params(p, func_param.clone()));
+            }
+            return Exp::Call(Box::new(new_fun), new_para, ann);
+        },
+        Exp::Array(vec, ann) => {
+            let mut new_e:Vec<Exp<ann>> = Vec::new();
+            for p in vec{
+                new_e.push(lift_replace_def_params(p, func_param.clone()));
+            }
+            return Exp::Array(new_e, ann);
+        }
+        Exp::ArraySet{array, index, new_value, ann} => {
+            let (a, i, nv);
+            a = Box::new(lift_replace_def_params(*array, func_param.clone()));
+            i = Box::new(lift_replace_def_params(*index, func_param.clone()));
+            nv = Box::new(lift_replace_def_params(*new_value, func_param.clone()));
+            return Exp::ArraySet { array: a, index: i, new_value: nv, ann: ann };
+        }
+        Exp::Semicolon{e1, e2, ann} => {
+            let (r1, r2);
+            r1 = Box::new(lift_replace_def_params(*e1, func_param.clone()));
+            r2 = Box::new(lift_replace_def_params(*e2, func_param.clone()));
+            return Exp::Semicolon { e1: r1, e2: r2, ann: ann };
+        }
+        //1.1 convert let lambdas to let def
+        // (lambda x: x + 1 end) -> def lambda_1(x): x + 1 in lambda_1
+        Exp::Lambda{parameters, body, ann} => {
+            panic!("lambda_lift 1.2 found a lambda");
+            return e;
+        }
+        Exp::MakeClosure{arity, label, env, ann} => {
+            return Exp::MakeClosure { arity: arity, label: label, env: Box::new(lift_replace_def_params(*env, func_param)), ann: ann };
+        }
+    }
+    panic!("lift 1.2 failed to return inside match");
+    return e;
+}
+
 //2 use hashtable to create MakeClosures
-fn lift_replace_func_call<ann: Clone>(p: Exp<ann>, mut func_param: HashMap<String, Vec<String>>)-> Exp<ann>{
+fn lift_replace_func_call<ann: Clone + std::marker::Copy + std::fmt::Display>
+(p: Exp<ann>, mut func_param: HashMap<String, (usize, Vec<String>)>) -> Exp<ann>{
     match p {
         Exp::Num(_, _) => return p,
         Exp::Bool(_, _) => return p,
@@ -1417,7 +1531,6 @@ fn lift_replace_func_call<ann: Clone>(p: Exp<ann>, mut func_param: HashMap<Strin
                 
                 let mut new_para = curr_decl.parameters.clone();
                 
-                new_para.append(&mut func_param.get(&curr_decl.name).unwrap().clone());
                 let new_decl = FunDecl { 
                     name: curr_decl.name, 
                     parameters: new_para, 
@@ -1442,50 +1555,62 @@ fn lift_replace_func_call<ann: Clone>(p: Exp<ann>, mut func_param: HashMap<Strin
             */
         Exp::Call(fun, parameters, ann) => {
             let mut fun_name;
+            
             match *fun.clone() {
                 Exp::Var(s, _) => {fun_name = s;},
                 _ => {panic!();}
             }
-            let mut let_bindings:Vec<(String, Exp<ann>)>;
-            let mut array_stuff = Vec::new();
-            let array = Exp::Array(array_stuff, ann.clone());
-            let array = Exp::Array(array_stuff, ann.clone());
+            let mut let_bindings:Vec<(String, Exp<ann>)> = Vec::new();
+            
+            let env = &func_param.get(&fun_name).unwrap().1; // env = [x1,x2,x3,f,g]
+            // func_param = [ (f, [x1,x2,x3,f,g]), (g, [x1,x2,x3,f,g])]
+            // want env (env.len() - func_param.len() , env.len() -1)
+            // want env[]
+            let funs_list = &env[(env.len() - func_param.len())..] ; //[f,g] 
+
             // length = (all the vars in env) + (number of total functions)
             // array = func_param.get(fun) + func_param.len()
 
-            // normal vars
-            for x in func_param.clone().get(&fun_name).unwrap() {
+            // 
+            let mut array_stuff = Vec::new();
+            for x in env.clone() {
                 array_stuff.push(Exp::Var(x.to_string(), ann.clone()));
             }
 
-            // add empty space to array
-            for f in func_param.clone() { array_stuff.push(Exp::Num(0, ann.clone()));}
-
-            let array_name = format!("Array_"); // IDK if this should be unique, and idk how to make it unique
+            let array_name = format!("Array_{}", ann); // IDK if this should be unique, and idk how to make it unique
             
             // create array in let statement
-            let_bindings.push((array_name, array.clone()));
+            let array = Exp::Array(array_stuff, ann.clone());
+            let_bindings.push((array_name.clone(), array.clone()));
 
             // for each function add a let binding (fun_name = make_closure)
-            for f in func_param.clone() {
-                let_bindings.push((f.0, Exp::MakeClosure { 
-                    arity: f.1.len(), 
-                    label: f.0, 
+            for f in funs_list.clone() {
+                let arity = func_param.get(&f.to_string()).unwrap().0; 
+                let_bindings.push((f.clone(), Exp::MakeClosure { 
+                    arity: arity,
+                    label: f.clone(), 
                     env: Box::new(array.clone()), 
                     ann: ann.clone() }));
             }
 
+            // fix parameters to include array
             let old_call = Box::new(Exp::Call(fun, parameters, ann.clone()));
             let mut new_body = old_call;
 
+
+            // env = [x1, x2, x3, 0, 0],
+            // func_param = hashmap [ (f, [x1,x2,x3,f,g]), (g, [x1,x2,x3,f,g])]
+            // want to replace f and g with closures
+            // 
+
             // overwrite the empty spaces in array with created make_closures
-            let mut i = (func_param.clone().get(&fun_name).unwrap().len() as i64) - 1;
-            for f in func_param.clone() {
+            let mut i = (env.len() - funs_list.len()) as i64;
+            for f in funs_list {
                 new_body = Box::new(Exp::Semicolon { 
                     e1: Box::new(Exp::ArraySet { 
                         array: Box::new(Exp::Var(array_name.to_string(), ann.clone())), 
                         index: Box::new(Exp::Num(i, ann.clone())), 
-                        new_value: Box::new(Exp::Var(f.0, ann.clone())), 
+                        new_value: Box::new(Exp::Var(f.to_string(), ann.clone())), 
                         ann: ann.clone() 
                     }), 
                     e2: new_body, 
@@ -1493,11 +1618,7 @@ fn lift_replace_func_call<ann: Clone>(p: Exp<ann>, mut func_param: HashMap<Strin
                 });
                 i += 1;
             }
-
             return Exp::Let { bindings: let_bindings, body: new_body, ann: ann };
-            panic!("NYI:: Lift part 2 call");
-           
-            
         },
         Exp::Array(vec, ann) => {
             let mut new_e:Vec<Exp<ann>> = Vec::new();
@@ -1531,18 +1652,21 @@ fn lift_replace_func_call<ann: Clone>(p: Exp<ann>, mut func_param: HashMap<Strin
             return Exp::FunDefs { decls: vec![new_decl], body: body, ann: ann };
         }
         Exp::MakeClosure{arity, label, env, ann} => {
-            return Exp::MakeClosure { arity: arity, label: label, env: Box::new(lift_convert_lambdas(*env)), ann: ann };
+            return Exp::MakeClosure { 
+                arity: arity, label: label, 
+                env: Box::new(lift_convert_lambdas(*env)), 
+                ann: ann };
             }
     }
 }
 
 // Precondition: all names are uniquified
-fn lambda_lift<Ann: std::marker::Copy>(p: &Exp<Ann>) -> (Vec<FunDecl<Exp<()>, ()>>, Exp<()>) {
+fn lambda_lift<Ann: Clone + std::marker::Copy + std::fmt::Display>(p: &Exp<Ann>) -> (Vec<FunDecl<Exp<()>, ()>>, Exp<()>) {
 
     // calls don't change anymore 
     // turn all lambdas into defs
-    // turn all defs into calls
-    // turn all removed defs and lambdas into defs on the top level
+    
+    // move all the defs to the top level
 
 
 
@@ -1550,7 +1674,7 @@ fn lambda_lift<Ann: std::marker::Copy>(p: &Exp<Ann>) -> (Vec<FunDecl<Exp<()>, ()
     //1 make hashmap linking each function with all variables in further out scope
     let mut fun_env = lift_create_hashmap(p.clone(), Vec::new(), HashMap::new());
 
-    //1.1 turn lambdas into functions
+    // 1.1 turn lambdas into functions
     // e.g. let x = (lambda x: x + 1 end) in 42 
     //   -> let x = def lambda_0(x): x+1 in lambda_0 in 42
     // also create a list of function names
@@ -1558,6 +1682,22 @@ fn lambda_lift<Ann: std::marker::Copy>(p: &Exp<Ann>) -> (Vec<FunDecl<Exp<()>, ()
     e = lift_convert_lambdas(p.clone());
     // recreate function environment to include the functions converted from lambdas
     fun_env = lift_create_hashmap(e.clone(), Vec::new(), HashMap::new());
+
+    // append ordered list of every function to each value in fun_Env
+    let mut vector_of_functions = Vec::new();
+    for fun in fun_env.clone(){
+        vector_of_functions.push(fun.0);
+    }
+    let mut newmap = HashMap::new();
+    for fun in fun_env{
+        let mut tmp = fun.1.1;
+        tmp.append(&mut vector_of_functions.clone());
+        newmap.insert(fun.0, (fun.1.0, tmp));
+    }
+    let fun_env = newmap;
+
+    // 1.2 replace def(params) {body} with def(env_array, params) {let env1=env_aray[1], env2 ... in body}
+    e = lift_replace_def_params(e.clone(), fun_env.clone());
 
   /*  if (false) {
         println!("func_param contains:");
@@ -1568,8 +1708,6 @@ fn lambda_lift<Ann: std::marker::Copy>(p: &Exp<Ann>) -> (Vec<FunDecl<Exp<()>, ()
             }        
             println!(function:{}, possible outer varibles:{}", x.0, args_vec_string);}
     }// */
-
-        
     //1.5 optimize
    // fun_env = lift_optimize(e.clone(), fun_env);
 
@@ -2726,7 +2864,7 @@ where
     // first check for errors
     check_prog(p)?;
     // then give all the variables unique names
-    let uniq_p = uniquify(&tag_exp(p));
+    let uniq_p = tag_exp(&uniquify(&tag_exp(p)));
 
     // lift definitions to the top level
     let (defs, main) = lambda_lift(&uniq_p);
