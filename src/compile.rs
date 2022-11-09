@@ -271,6 +271,241 @@ where
     
 }
 
+fn check_prog_helper_prints<'a, Span>(
+    p: &'a SurfProg<Span>,
+    mut vars: HashSet<String>,
+    mut funs: HashSet<String>,
+) -> (Result<(), CompileErr<Span>>, HashSet<String>)
+where
+    Span: Clone,
+{
+    let max = std::i64::MAX >> 1;
+    let min = std::i64::MIN >> 1;
+    match p {
+        SurfProg::Num(n, ann) => {
+            // check if n is greater than max_snake_int or less than min_snake_int
+            print!("Num({})", n);
+            if n > &max || n < &min {
+                return (Err(CompileErr::Overflow { num: *n, location: ann.clone() }), funs);
+              } else {
+                return (Ok(()), funs);
+              }
+        }, 
+        SurfProg::Var(s, ann) => {
+            // if varible is not defined, return CompilErr UnboundVariable with useful args
+            print!("Var({})", s);
+            if vars.contains(s) {
+                return (Ok(()), funs);
+            } else if funs.contains(s) {
+                return (Ok(()), funs);
+            } else {
+                /*if (funs.contains_key(s)){
+                    return (Err(CompileErr::FunctionUsedAsValue { 
+                        function_name: s.to_string(), 
+                        location: ann.clone() 
+                    }), funs);
+                }*/
+                return (Err(CompileErr::UnboundVariable {
+                    unbound: s.to_string(),
+                    location: ann.clone(),
+                }), funs);
+            }
+        }
+        SurfProg::Bool(b, _Ann) => {
+            print!("Bool({})", b);
+            return (Ok(()), funs);
+        }
+        SurfProg::Prim1(_p, sub, _ann) => {
+
+            print!("Prim1(p, ");
+            let out = check_prog_helper_prints(sub, vars, funs);
+            print!(")");
+            return out;
+        }
+
+        // concrete: add1(1) + sub1(2)
+        // abstract: add(add1(1), sub1(2))
+        SurfProg::Prim2(_p, sub1, sub2, _ann) => {
+            // add, sub, and mul are okay if both subexpressions are okay
+            print!("Prim2(");
+            let (a, funs) = check_prog_helper_prints(sub1, vars.clone(), funs);
+            print!(", ");
+            let (b, funs) = check_prog_helper_prints(sub2, vars.clone(), funs);
+            print!(")");
+            if a.is_err() {
+                return (a, funs);
+            } else if b.is_err() {
+                return (b, funs);
+            } else {
+                return (Ok(()), funs);
+            }
+        }
+        // let x = 2, y = 3, z=4 in {
+        //    let z = 2 in 5
+        // }
+        SurfProg::Let {
+            bindings,
+            body,
+            ann,
+        } => {
+            //if > 1 binding per varible, return CompileErr DuplicateBinding(args)
+            let mut new_vars: HashSet<&String> = HashSet::new(); // don't let inner varibles leak to outer scope
+            
+            print!("Let((Bindings(");
+            for (s, sub) in bindings {
+                // for each string s and expression sub in bindings
+                let mut temp;
+                print!("{} = ", s);
+                (temp, funs) = check_prog_helper_prints(sub, vars.clone(), funs.clone());
+                print!(", ");
+                if (temp.is_err()) {return (temp, funs);} // return error if subexpression is invalid
+                if new_vars.contains(s) {
+                    return (Err(CompileErr::DuplicateBinding {
+                        duplicated_name: s.to_string(),
+                        location: ann.clone(), // duplicate in scope
+                    }), funs);
+                } else {
+                    new_vars.insert(s);
+                    vars.insert(s.to_string());
+                }
+            }
+            print!("), Let_body(");
+            let a = check_prog_helper_prints(body, vars, funs);
+            print!("))");
+            return a;
+        }
+        SurfProg::If {
+            cond,
+            thn,
+            els,
+            ann,
+        } => {
+            let subs = vec![cond, thn, els];
+            print!("If(");
+            for x in subs {
+                let a = check_prog_helper_prints(x, vars.clone(), funs.clone());
+                print!(", ");
+                if a.0.is_err() {
+                    return a;
+                }
+            }
+            print!(")");
+            return (Ok(()), funs);
+        }
+        SurfProg::Call(fun, args, ann) => {
+            // returns errors: FunctionCalledWrongArity, ValueUsedAsFunction, UndefinedFunction
+            let cur_num_args = args.len();
+            print!("Call(");
+            check_prog_helper_prints(fun, vars.clone(), funs.clone());
+            print!(", args:[");
+            
+            for cur_arg in args {
+                let (temp, funs_temp) = check_prog_helper_prints(cur_arg, vars.clone(), funs);
+                print!(",");
+                funs = funs_temp;
+                if temp.is_err() { return (temp, funs); }
+            }
+            print!("])");
+            return (Ok(()), funs);
+        }
+
+        SurfProg::FunDefs { decls, body, ann } => {
+            print!("FunDefs(stuff, body(");
+            for curr_dec in decls{
+
+                if funs.contains(&curr_dec.name) {
+                    //println!("got true ");
+                    return (Err(CompileErr::DuplicateFunName {
+                        duplicated_name: curr_dec.name.to_string(),
+                        location: ann.clone(),
+                    }), funs);
+                }
+                else{
+                    let mut para = curr_dec.parameters.clone();
+                    // let mut para_clone = curr_dec.parameters.clone();
+                    while para.len() > 0{//foo(a,b,a)
+                        let temp = para.pop().unwrap();
+                    // let temp = para_clone.pop().unwrap();
+                        if para.contains(&temp) {
+                            return (Err(CompileErr::DuplicateArgName { 
+                                duplicated_name: temp, 
+                                location: ann.clone(), 
+                            }), funs);
+                        } 
+                        vars.insert(temp);
+                        
+                    }
+                    funs.insert(curr_dec.name.to_string());
+                    let (temp_error, temp_funs) = check_prog_helper_prints(&curr_dec.body, vars.clone(), funs);
+                    funs = temp_funs;
+                    if (temp_error.is_err()) {
+                        return (temp_error, funs);
+                    }
+                }   
+            }
+            let x = check_prog_helper_prints(body, vars, funs);
+            print!(")");
+            return x;
+        }
+
+        SurfProg::Array(vec, ann) => {
+            print!("Array(stuff)");
+
+            for curr_exp in vec{
+                let result;
+                (result, funs) = check_prog_helper_prints(curr_exp, vars.clone(), funs.clone());
+                if (result.is_err()) {return (result, funs);}
+            }
+            return (Ok(()), funs);
+        }
+        SurfProg::ArraySet{array, index, new_value, ann} => {
+            print!("Arrayset(stuff)");
+
+            let mut result;
+            (result, funs) = check_prog_helper_prints(array, vars.clone(), funs.clone());
+            if (result.is_err()) {return (result, funs);}
+            (result, funs) = check_prog_helper_prints(index, vars.clone(), funs.clone());
+            if (result.is_err()) {return (result, funs);}
+            (result, funs) = check_prog_helper_prints(new_value, vars.clone(), funs.clone());
+            if (result.is_err()) {return (result, funs);}
+            return (Ok(()), funs);
+
+        }
+        SurfProg::Semicolon{e1, e2, ann} => {
+            print!("Semicolon(stuff)");
+
+            let mut result;
+            (result, funs) = check_prog_helper_prints(e1, vars.clone(), funs.clone());
+            if (result.is_err()) {return (result, funs);}
+            (result, funs) = check_prog_helper_prints(e2, vars.clone(), funs.clone());
+            if (result.is_err()) {return (result, funs);}
+            return (Ok(()), funs);
+        }
+        SurfProg::Lambda{parameters, body, ann} => {
+            //panic!("NYI::Lambda");
+            print!("Lambda(stuff)");
+            let mut new_vars: HashSet<&String> = HashSet::new();
+            for s in parameters {
+                if new_vars.contains(s) {
+                    return (Err(CompileErr::DuplicateBinding {
+                        duplicated_name: s.to_string(),
+                        location: ann.clone(),
+                    }), funs);
+                } else {
+                    new_vars.insert(s);
+                    vars.insert(s.to_string());
+                }
+            }
+            return check_prog_helper_prints(body, vars, funs);
+        }
+        SurfProg::MakeClosure{arity, label, env, ann} => {
+            print!("MakeClosure(stuff)");
+
+            return check_prog_helper_prints(env, vars, funs);
+        }
+    }
+    
+}
 
 fn check_prog_helper2<'a, Span>(
     p: &'a SurfProg<Span>,
@@ -390,23 +625,27 @@ where
             return (Ok(()), funs);
         }
         SurfProg::Call(fun, args, ann) => {
-            panic!("NYI: checkprog2 call");
-            // returns errors: FunctionCalledWrongArity, ValueUsedAsFunction, UndefinedFunction
-            /*let cur_num_args = args.len();
-            
-            if ((!funs.contains_key(fun))&&!vars.contains(fun)) {
-                //UndefinedFunction
-                return (Err(CompileErr::UndefinedFunction {
-                    undefined: fun.to_string(), 
-                    location: ann.clone(), 
-                }),funs);
-            } 
+
+            match *fun.clone(){
+                SurfProg::Var(s, _) => {
+                    if (!vars.contains(&s) && !funs.contains(&s)) {
+                        return (Err(CompileErr::UnboundVariable {
+                            unbound: s.to_string(),
+                            location: ann.clone(),
+                        }), funs);
+                    }
+                }
+                SurfProg::Lambda { parameters, body, ann } => { panic!("NYI:Check_prog_2 call lambda")}
+                _ => { panic!("Check_prog_2 call did not contain a var."); }
+            }
+
             for cur_arg in args {
                 let (temp, funs_temp) = check_prog_helper2(cur_arg, vars.clone(), funs);
                 funs = funs_temp;
                 if temp.is_err() { return (temp, funs); }
             }
-            return (Ok(()), funs);*/
+            return (Ok(()), funs);
+            
         }
 
         SurfProg::FunDefs { decls, body, ann } => {
@@ -493,7 +732,8 @@ where
 pub fn check_prog<Span>(p: &SurfProg<Span>) -> Result<(), CompileErr<Span>>
 where
     Span: Clone,
-{
+{   
+   // println!(); check_prog_helper_prints(p, HashSet::new(), HashSet::new()); println!();
     let (x, fun_list) = check_prog_helper(p, HashSet::new(), HashSet::new());
     if x.is_err() {return x;}
     return check_prog_helper2(p, HashSet::new(), fun_list).0;
@@ -586,21 +826,68 @@ fn uni_helper(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
 
         },
         Exp::Call(s, a, _) => {
-            panic!("nyi uni_helper call");
+            let fun_name;
+            match *s.clone(){
+                Exp::Var(x, _) => {fun_name = Exp::Var(x.to_string(), ());}
+                _ => {panic!("uni_helper calling something not var");}
+            }
 
-            /*let mut new_parameters:Vec<Exp<()>> = Vec::new();
+            let mut new_parameters:Vec<Exp<()>> = Vec::new();
             for cur_p in a{
                 let renamed_para;
                 (renamed_para, new_funs) = uni_helper(cur_p, new_vars.clone(), new_funs, count);
                 new_parameters.push(renamed_para);
             }
-            return (Exp::Call(*s, new_parameters, ()), new_funs);*/
+            return (Exp::Call(Box::new(fun_name), new_parameters, ()), new_funs);
         }
-        Exp::Array(vec, ann) => {panic!("nyi:uni_helper array");}
-        Exp::ArraySet{array, index, new_value, ann} => {panic!("nyi:uni_helper arrayset");}
-        Exp::Semicolon{e1, e2, ann} => {panic!("nyi:uni_helper Semicolon");}
-        Exp::Lambda{parameters, body, ann} => {panic!("NYI:uni_helper Lambda");}
-        Exp::MakeClosure{arity, label, env, ann} => {panic!("NYI:uni_helper MakeClosure");}
+        Exp::Array(vec, ann) => {
+            let mut new_vec: Vec<Exp<()>> = Vec::new();
+            //let mut new_vars: HashSet<&String> = HashSet::new();
+
+            for curr_exp in vec{
+                let mut x;
+                x = uni_helper(curr_exp, new_vars.clone(), new_funs, count);
+                new_funs = x.1;
+                new_vec.push(x.0);
+
+            }
+            return ((Exp::Array(new_vec, ())), new_funs);
+        }
+        Exp::ArraySet{array, index, new_value, ann} => {
+            //panic!("nyi:uni_helper arrayset");
+            let (new_array, new_index, new_value2);
+            (new_array, new_funs) = uni_helper(array, new_vars.clone(), new_funs, count);
+            (new_index, new_funs) = uni_helper(index, new_vars.clone(), new_funs, count);
+            (new_value2, new_funs) = uni_helper(new_value, new_vars.clone(), new_funs, count);
+            return (Exp::ArraySet{ 
+                array: Box::new(new_array), 
+                index: Box::new(new_index), 
+                new_value: Box::new(new_value2), 
+                ann: ()}, new_funs);
+        }
+        Exp::Semicolon{e1, e2, ann} => {
+            let (new_e1, new_e2);
+            (new_e1, new_funs) = uni_helper(e1, new_vars.clone(), new_funs, count);
+            (new_e2, new_funs) = uni_helper(e2, new_vars.clone(), new_funs, count);
+            return (Exp::Semicolon { e1: Box::new(new_e1), e2: Box::new(new_e2), ann: (),},new_funs)
+        }
+        Exp::Lambda{parameters, body, ann} => {
+            let mut new_parameters:Vec<String> = Vec::new();
+                for curr_parameter in parameters.clone() {
+                    let new_parameter_name = format!("Lambda_{}_param_{}", ann, count.0);
+                    count.0 +=1;
+                    new_vars.insert(curr_parameter, new_parameter_name.to_string());
+                    new_parameters.push(new_parameter_name);
+                }
+            // rename all the varibles inside the body
+            let new_body;
+            (new_body, new_funs) = uni_helper(&body, new_vars.clone(), new_funs, count);
+
+            return (Exp::Lambda{parameters: new_parameters, body: Box::new(new_body), ann: ()}, new_funs);
+        }
+        Exp::MakeClosure{arity, label, env, ann} => {
+            panic!("MakeClosure in unqi_helper");
+        }
     }
 
 }
@@ -645,13 +932,62 @@ fn uni_fix_calls(e: &Exp<()>, new_funs: HashMap<String,String>) -> Exp<()>{
                 }
             return Exp::FunDefs { decls: new_declarations, body: Box::new(uni_fix_calls(body, new_funs.clone())), ann: () };
         },
-        Exp::Call(fun, args, _) => {panic!("nyi:uni_fix_calls call");} //return Exp::Call(new_funs.get(fun).unwrap().to_string(), args.clone(), ()),
+        Exp::Call(fun, args, _) => {
+            let fun_name;
+            match *fun.clone(){
+                Exp::Var(x, _) => {
+                    fun_name = Exp::Var(new_funs.get(&x).unwrap().to_string(), ());
+                }
+                _ => {panic!("uni_helper_fix_calls calling something not var");}
+            }
+            let mut new_parameters:Vec<Exp<()>> = Vec::new();
+            for cur_p in args{
+                let renamed_para = uni_fix_calls(cur_p, new_funs.clone());
+                new_parameters.push(renamed_para);
+            }
+            return Exp::Call(Box::new(fun_name), new_parameters, ());
+        }
 
-        Exp::Array(vec, ann) => {panic!("nyi:uni_fix_calls array");}
-        Exp::ArraySet{array, index, new_value, ann} => {panic!("nyi:uni_fix_calls arrayset");}
-        Exp::Semicolon{e1, e2, ann} => {panic!("nyi:uni_fix_calls Semicolon");}
-        Exp::Lambda{parameters, body, ann} => {panic!("NYI:uni_fix_calls Lambda");}
-        Exp::MakeClosure{arity, label, env, ann} => {panic!("NYI:uni_fix_calls MakeClosure");}
+        Exp::Array(vec, ann) => {
+            let mut new_vec: Vec<Exp<()>> = Vec::new();
+            //let mut new_vars: HashSet<&String> = HashSet::new();
+
+            for curr_exp in vec{
+                let mut x;
+                x = uni_fix_calls(curr_exp, new_funs.clone());
+                
+                new_vec.push(x);
+
+            }
+            return Exp::Array(new_vec, ());
+        }
+        Exp::ArraySet{array, index, new_value, ann} => {
+            //panic!("nyi:uni_helper arrayset");
+            let (new_array, new_index, new_value2);
+            new_array = uni_fix_calls(array, new_funs.clone());
+            new_index = uni_fix_calls(index, new_funs.clone());
+            new_value2 = uni_fix_calls(new_value, new_funs.clone());
+            return Exp::ArraySet{ 
+                array: Box::new(new_array), 
+                index: Box::new(new_index), 
+                new_value: Box::new(new_value2), 
+                ann: ()};
+        }
+        Exp::Semicolon{e1, e2, ann} => {
+            let (new_e1, new_e2);
+            new_e1 = uni_fix_calls(e1, new_funs.clone());
+            new_e2 = uni_fix_calls(e2, new_funs.clone());
+            return Exp::Semicolon { e1: Box::new(new_e1), e2: Box::new(new_e2), ann: (),};
+        }
+        Exp::Lambda{parameters, body, ann} => {
+            
+            let new_body = uni_fix_calls(&body, new_funs.clone());
+
+            return Exp::Lambda{parameters: parameters.clone(), body: Box::new(new_body), ann: ()};
+        }
+        Exp::MakeClosure{arity, label, env, ann} => {
+            panic!("MakeClosure in unqi_helper");
+        }
     }
     
 }
@@ -950,17 +1286,21 @@ fn lift_top_level<ann>(p: Exp<ann>, mut funs: Vec<FunDecl<Exp<()>, ()>>) -> (Vec
 // Precondition: all names are uniquified
 fn lambda_lift<Ann: std::marker::Copy>(p: &Exp<Ann>) -> (Vec<FunDecl<Exp<()>, ()>>, Exp<()>) {
 
+    // turn all lambdas into function calls and put the body into a hashmap <lambda_name, (env, body(exp))>
+    // return modifed expression and hashmap of lambda definitions
+
     //1 make hashtable of all variables in outer scope (excluding pre existing parameters)
     let mut func_param = lift_create_hashset(p.clone(), Vec::new(), HashMap::new());
 
-    /*
-    println!("func_param contains:");
-    for x in func_param.clone(){
-        let mut args_vec_string = "".to_string();
-        for a in x.1{
-            args_vec_string = format!("{}, {}", a, args_vec_string);
-        }        println!("function:{}, possible outer varibles:<{}>", x.0, args_vec_string);
-    }*/
+    
+    if (false) {
+        println!("func_param contains:");
+        for x in func_param.clone(){
+            let mut args_vec_string = "".to_string();
+            for a in x.1{
+                args_vec_string = format!("{}, {}", a, args_vec_string);
+            }        println!("function:{}, possible outer varibles:<{}>", x.0, args_vec_string);
+    }}
 
     //1.5 optimize
     func_param = lift_optimize(p.clone(), func_param);

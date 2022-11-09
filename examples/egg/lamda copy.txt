@@ -1,0 +1,39 @@
+let applyToFive = (lambda it: it(5) end) in
+let incr = (lambda x: x + 1 end) in
+applyToFive(incr)
+
+
+def lambda1(seven, x): x + seven and
+def lambda2(y): y + 1 in
+let f = if read_bool(): (let seven = 7 in lambda1) else: lambda2
+in
+f(5)
+
+
+with closures
+def lambda1(env, x): let seven = env[0] in x + seven and
+def lambda2(env, y): y + 1 in
+let f = if read_bool():
+          (let seven = 7 in make_closure(1, lambda1, [seven]))
+        else:
+          make_closure(1, lambda2, [])
+in
+f(5)
+
+
+def add2(x):
+  x + 2
+in add2(1) + add2(3)
+
+
+exp::FunDefs {
+        decls: [FunDecl(
+            name: "add2", 
+            parameters: <>, 
+            Exp::prim2(add, var:x, num:2), 
+            Ann)
+          Ann],
+        body: // add2(1) + add2(3)
+            Box::new(exp::prim2(add, exp::call(exp::var("add2")), exp::call(?))),
+        ann: Ann,
+    },

@@ -55,15 +55,8 @@ fn sprint_snake_val(x: SnakeVal) -> String {
 
 #[export_name = "\x01print_snake_val"]
 extern "sysv64" fn print_snake_val(v: SnakeVal) -> SnakeVal {
-    if x.0 & INT_TAG == 0 { // it's a number
-        format!("{}", unsigned_to_signed(x.0) >> 1)
-    } else if x == SNAKE_TRU {
-        String::from("true")
-    } else if x == SNAKE_FLS {
-        String::from("false")
-    } else {
-	format!("unimplemented or Invalid snake value 0x{:x}", x.0)
-    }
+    println!("{}", sprint_snake_val(v));
+    return v;
 }
 
 /* Implement the following error function. You are free to change the
