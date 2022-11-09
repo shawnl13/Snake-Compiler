@@ -2031,7 +2031,7 @@ fn sequentialize_helper(e: &Exp<u32>) -> SeqExp<()> {
 
             
         }
-
+        
         // 2 - 3
 
         // let x1 = 2 in let x2 = 3 in x1 - x2
@@ -2169,11 +2169,38 @@ fn sequentialize_helper(e: &Exp<u32>) -> SeqExp<()> {
 
             return out;*/
         }
-        Exp::Array(vec, ann) => {panic!("nyi:sequentialize_helper array");}
-        Exp::ArraySet{array, index, new_value, ann} => {panic!("nyi:sequentialize_helper arrayset");}
-        Exp::Semicolon{e1, e2, ann} => {panic!("nyi:sequentialize_helper Semicolon");}
-        Exp::Lambda{parameters, body, ann} => {panic!("NYI:sequentialize_helper Lambda");}
-        Exp::MakeClosure{arity, label, env, ann} => {panic!("NYI:sequentialize_helper MakeClosure");}
+        Exp::Array(vec, ann) => {
+            let mut new_vec = Vec::new();
+            for curr_immexp in vec{
+                new_vec.push(return_immediate(curr_immexp).unwrap());
+                
+            }
+        }
+        Exp::ArraySet{array, index, new_value, ann} => {
+            return SeqExp::ArraySet { 
+                array: return_immediate(array).unwrap(), 
+                index: return_immediate(index).unwrap(), 
+                new_value: return_immediate(new_value).unwrap(), 
+                ann: () 
+            }    
+        
+        }
+        Exp::Semicolon{e1, e2, ann} => {
+            return SeqExp::Let { 
+                var: format!("disposable_{}", ann).to_string(),
+                bound_exp: Box::new(sequentialize_helper(e1)), 
+                body: Box::new(sequentialize_helper(e2)), 
+                ann: () 
+            };
+        }
+        Exp::Lambda{parameters, body, ann} => {panic!("Tried to sequentialize a  Lambda");}
+        Exp::MakeClosure{arity, label, env, ann} => {
+            return SeqExp::MakeClosure { 
+                arity: *arity, 
+                label: label.to_string(), 
+                env: return_immediate(env).unwrap(), 
+                ann: () };
+        }
     }
 }
 #[cfg(test)]
