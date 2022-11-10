@@ -1,4 +1,2 @@
-let unit = [] in
-let one = [1] in
 let three = [3, 4, 5] in
 three[0]

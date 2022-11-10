@@ -1119,18 +1119,36 @@ fn lift_create_hashmap<ann>(p: Exp<ann>, mut env: Vec<String>, mut func_param: H
             }
             return lift_create_hashmap(*body, env, func_param);
         },
-        Exp::Call(_, para, _) => {
-            panic!("NYI: lift_create_hashset call");
-            /*for e in para{
-                func_param = lift_create_hashset(e,env.clone(), func_param.clone());
+        Exp::Call(fun, para, _) => {
+            for e in para{
+                func_param = lift_create_hashmap(e,env.clone(), func_param.clone());
             }
-            return func_param;*/
+            func_param = lift_create_hashmap(*fun,env.clone(), func_param.clone());
+            return func_param;
         },
-        Exp::Array(vec, ann) => {panic!("nyi:lift_create_hashset array");}
-        Exp::ArraySet{array, index, new_value, ann} => {panic!("nyi:lift_create_hashset arrayset");}
-        Exp::Semicolon{e1, e2, ann} => {panic!("nyi:lift_create_hashset Semicolon");}
-        Exp::Lambda{parameters, body, ann} => {panic!("NYI:lift_create_hashset Lambda");}
-        Exp::MakeClosure{arity, label, env, ann} => {panic!("NYI:lift_create_hashset MakeClosure");}
+        Exp::Array(vec, ann) => {
+            for v in vec {
+                func_param = lift_create_hashmap(v, env.clone(), func_param);
+            }
+            return func_param;
+        }
+        Exp::ArraySet{array, index, new_value, ann} => {
+            //HashMap<String, (usize, Vec<String>)>
+            func_param = lift_create_hashmap(*array, env.clone(), func_param);
+            func_param = lift_create_hashmap(*index, env.clone(), func_param);
+            func_param = lift_create_hashmap(*new_value, env, func_param);
+            return func_param;
+        }
+        Exp::Semicolon{e1, e2, ann} => {
+            func_param = lift_create_hashmap(*e1, env.clone(), func_param);
+            func_param = lift_create_hashmap(*e2, env, func_param);
+            return func_param;
+        }
+        Exp::Lambda{parameters, body, ann} => {
+            func_param = lift_create_hashmap(*body, env, func_param);
+            return func_param;
+        }
+        Exp::MakeClosure{arity, label, env, ann} => {panic!("Lambda lift 1 found a MakeClosure");}
     } 
 }
 
@@ -1267,21 +1285,39 @@ fn lift_top_level<ann>(p: Exp<ann>, mut funs: Vec<FunDecl<Exp<()>, ()>>) -> (Vec
                     // 4
         },
 
-        Exp::Call(fun, args, _) => {
-            panic!("NYI: call lift_top_level");/*
-            let mut recursed_args:Vec<Exp<()>> = Vec::new();
-            for a in args {
-                let tmp;
-                (funs, tmp) = lift_top_level(a, funs);
-                recursed_args.push(tmp);
+        Exp::Call(fun, args, _) => { panic!("lift_top_level contains call"); },
+        Exp::Array(vec, _) => {
+            let mut new_vec = Vec::new();
+            for v in vec {
+                let x;
+                (funs, x) = lift_top_level(v, funs);
+                new_vec.push(x);
             }
-            return (funs, Exp::Call(fun, recursed_args, ()));*/
-        },
-        Exp::Array(vec, ann) => {panic!("nyi:lift_top_level array");}
-        Exp::ArraySet{array, index, new_value, ann} => {panic!("nyi:lift_top_level arrayset");}
-        Exp::Semicolon{e1, e2, ann} => {panic!("nyi:lift_top_level Semicolon");}
-        Exp::Lambda{parameters, body, ann} => {panic!("NYI:lift_top_level Lambda");}
-        Exp::MakeClosure{arity, label, env, ann} => {panic!("NYI:lift_top_level MakeClosure");}
+            return (funs, Exp::Array(new_vec, ()));
+        }
+        Exp::ArraySet{array, index, new_value, ann} => {
+            let (funs, recursed_array) = lift_top_level(*array, funs);
+            let (funs, recursed_index) = lift_top_level(*index, funs);
+            let (funs, recursed_new_value) = lift_top_level(*new_value, funs);
+            return (funs, Exp::ArraySet { 
+                array: Box::new(recursed_array), 
+                index: Box::new(recursed_index), 
+                new_value: Box::new(recursed_new_value), 
+                ann: () })
+        }
+        Exp::Semicolon{e1, e2, ann} => {
+            let (funs, recursed_e1) = lift_top_level(*e1, funs);
+            let (funs, recursed_e2) = lift_top_level(*e2, funs);
+            return (funs, Exp::Semicolon { e1: Box::new(recursed_e1), e2: Box::new(recursed_e2), ann: () })
+        }
+        Exp::Lambda{parameters, body, ann} => {
+            let (funs, recursed_body) = lift_top_level(*body, funs);
+            return (funs, Exp::Lambda { parameters: parameters, body: Box::new(recursed_body), ann: () })
+        }
+        Exp::MakeClosure{arity, label, env, ann} => {
+            let (funs, recursed_env) = lift_top_level(*env, funs);
+            return (funs, Exp::MakeClosure { arity: arity, label: label.to_string(), env: Box::new(recursed_env), ann: ()})
+        }
     }
 }
 
@@ -1667,9 +1703,6 @@ fn lambda_lift<Ann: Clone + std::marker::Copy + std::fmt::Display>(p: &Exp<Ann>)
     // turn all lambdas into defs
     
     // move all the defs to the top level
-
-
-
 
     //1 make hashmap linking each function with all variables in further out scope
     let mut fun_env = lift_create_hashmap(p.clone(), Vec::new(), HashMap::new());
@@ -2383,7 +2416,7 @@ fn logic_bool_err(reg_to_check: Reg) -> Vec<Instr> {
     // test RAX, 0x0000000000000001 ;; check only the tag bit of the value
     // jnz error_not_number         ;; if the bit is set, go to some centralized error handler
     let mut instructions = Vec::new();
-    instructions.push(Instr::Test(BinArgs::ToReg(reg_to_check, Arg32::Unsigned(1))));
+    instructions.push(Instr::Test(BinArgs::ToReg(reg_to_check, Arg32::Unsigned(7))));
     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rsi, Arg64::Reg(reg_to_check))));
     instructions.push(Instr::Jz(JmpArg::Label("error_logic_bool".to_string())));
     return instructions;
@@ -2391,12 +2424,77 @@ fn logic_bool_err(reg_to_check: Reg) -> Vec<Instr> {
 
 
 fn if_bool_err(reg_to_check: Reg) -> Vec<Instr> {
+    // test RAX, 0x077777777777777 ;; check only the tag bit of the value
+    // jnz error_not_number         ;; if the bit is set, go to some centralized error handler
+    let mut instructions = Vec::new();
+    instructions.push(Instr::Test(BinArgs::ToReg(reg_to_check, Arg32::Unsigned(7))));
+    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rsi, Arg64::Reg(reg_to_check))));
+    instructions.push(Instr::Jz(JmpArg::Label("error_if_bool".to_string())));
+    return instructions;
+}
+
+
+fn is_array(reg_to_check: Reg) -> Vec<Instr> {
     // test RAX, 0x0000000000000001 ;; check only the tag bit of the value
     // jnz error_not_number         ;; if the bit is set, go to some centralized error handler
     let mut instructions = Vec::new();
-    instructions.push(Instr::Test(BinArgs::ToReg(reg_to_check, Arg32::Unsigned(1))));
+    // 0x0000000002222001 valid array
+    // 0x0007456481153001 valid array
+    // 0x0000000000000000 not an array
+    // 0x0000000000077777 not an array
+
+    // mask to the last 3 bits
+    // and with 0x000000007
+    // all arrays will be 0x0000000000000001
+    //instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rsi, Arg64::Unsigned(7))));
+    
+    // story array pointer into rsi
     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rsi, Arg64::Reg(reg_to_check))));
-    instructions.push(Instr::Jz(JmpArg::Label("error_if_bool".to_string())));
+
+    instructions.push(Instr::And(BinArgs::ToReg(Reg::Rsi, Arg32::Unsigned(7))));
+    
+    // compare to 0x0000000000000001
+    instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rsi, Arg32::Unsigned(1))));
+    
+    
+
+    // jump if not equal
+    instructions.push(Instr::Jne(JmpArg::Label("error_is_array".to_string())));
+
+    return instructions;
+}
+
+fn index_number_err(reg_to_check: Reg) -> Vec<Instr> {
+    // test RAX, 0x0000000000000001 ;; check only the tag bit of the value
+    // jnz error_not_number         ;; if the bit is set, go to some centralized error handler
+    let mut instructions = Vec::new();
+    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rsi, Arg64::Reg(reg_to_check))));
+    instructions.push(Instr::Test(BinArgs::ToReg(Reg::Rsi, Arg32::Unsigned(1))));
+    instructions.push(Instr::Jnz(JmpArg::Label("error_index_number".to_string())));
+    return instructions;
+}
+
+fn index_bounds_err(reg_to_check: Reg, array_pointer: Reg) -> Vec<Instr> {
+    let mut instructions = Vec::new();
+
+    // untag array pointer
+    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rsi, Arg64::Reg(array_pointer))));
+    instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rsi, Arg32::Unsigned(1))));
+
+    // move array length to rsi
+    let mem = MemRef{reg:Reg::Rsi, offset:Offset::Constant(0)};
+    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rsi, Arg64::Mem(mem))));
+
+    // turn rsi into snake_val (x2)
+ //   instructions.push(Instr::Shl(BinArgs::ToReg(Reg::Rsi, Arg32::Unsigned(1))));
+    instructions.push(Instr::IMul(BinArgs::ToReg(Reg::Rsi, Arg32::Unsigned(2))));
+    
+    // cmp between rsi(length) and reg_to_check(index) which is Rbx
+    instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rsi, Arg32::Reg(reg_to_check))));    
+    
+    //jmp if less than or equal (jle)
+    instructions.push(Instr::Jle(JmpArg::Label("error_index_bounds".to_string())));
+    
     return instructions;
 }
 
@@ -2411,6 +2509,7 @@ fn if_bool_err(reg_to_check: Reg) -> Vec<Instr> {
 // Rdi: error codes in rust calls
 // Rsi: error faulty value in rust calls
 // R15: heap pointer (space for arrays)
+// R14: working register used in array set
 fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:bool) -> Vec<Instr> {
     let mut instructions = Vec::new();
     let ufalse: u64 = 0x7F_FF_FF_FF_FF_FF_FF_FF;
@@ -2737,7 +2836,40 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                     instructions.push(Instr::Label(done_lab.clone()));
                 }
                 Prim2::Neq => todo!(),
-                Prim2::ArrayGet => todo!(),
+                Prim2::ArrayGet => {
+                    // starts with arg1 in Rax, and arg2 in Rbx
+                    // Rax is array, Rbx is index
+
+                    // check rax is a array
+                    instructions.append(&mut is_array(Reg::Rax));
+                    
+                    
+
+                    // move index value into r14
+             //       instructions.push(Instr::Mov(MovArgs::ToReg(Reg::R14, Reg::Rbx)));
+
+                    // check that index is number
+                    instructions.append(&mut index_number_err(Reg::Rbx));
+
+                    // check that index is in bounds
+                    instructions.append(&mut index_bounds_err(Reg::Rbx, Reg::Rax));
+
+                    // untag Rax
+                    instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(1))));
+
+                    // find where the value is (array + index *8 + 1)
+                   // instructions.push(Instr::Mul(BinArgs::ToReg(Reg::Rbx, Arg32::Unsigned(8))));
+                   // instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::Rbx))));
+                    
+                    // write the value from array[index] to rax
+                    let mem = MemRef{ 
+                        reg: Reg::Rax, 
+                        offset: Offset::Computed { reg: Reg::Rbx, factor: 8, constant: 8 } // try setting const to 1 if broken
+                    };
+                    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Mem(mem))));
+
+
+                },
             }
             
         } 
@@ -2853,13 +2985,37 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
             }*/
         }
         SeqExp::ArraySet { array, index, new_value, ann } => {
-            // move array pointer into rax
-            compile_to_instrs_helper(&SeqExp::Imm(array.clone(), *ann), env.clone(), is_tail);
-
-            // check rax is a tuple
-            // tuple is 0b001
             
+            // Store new_value into r14
+            instructions.append(&mut compile_to_instrs_helper(&SeqExp::Imm(new_value.clone(), 0), env.clone(), is_tail));
+            instructions.push(Instr::Mov(MovArgs::ToReg(Reg::R14, Arg64::Reg(Reg::Rax))));
 
+            // Store index into Rbx
+            instructions.append(&mut compile_to_instrs_helper(&Box::new(SeqExp::<u32>::Imm(index.clone(), *ann),), env.clone(), is_tail));
+            instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rbx, Arg64::Reg(Reg::Rax))));
+
+            // Store array into rax
+            instructions.append(&mut compile_to_instrs_helper(&Box::new(SeqExp::<u32>::Imm(array.clone(), *ann),), env.clone(), is_tail));
+            
+            // check rax is a array
+            instructions.append(&mut is_array(Reg::Rax));
+            
+            // untag Rax
+            instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(1))));
+
+            // check that index is number
+            instructions.append(&mut index_number_err(Reg::Rbx));
+
+            // check that index is in bounds
+            instructions.append(&mut index_bounds_err(Reg::Rbx, Reg::Rax));
+
+            // write the r14 to array[index]
+            let mem = MemRef{ 
+                reg: Reg::Rax, 
+                offset: Offset::Computed { reg: Reg::Rbx, factor: 8, constant: 8 } 
+            };
+            instructions.push(Instr::Mov(MovArgs::ToMem(mem, Reg32::Reg(Reg::R14))));
+            
 
         },
         SeqExp::Array(vec, ann) => {
@@ -2967,6 +3123,33 @@ fn compile_to_instr_functions(funcs:Vec<FunDecl<SeqExp<u32>, u32>>, e: &SeqExp<u
     // should be inc
     instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
 
+
+
+    instructions.push(Instr::Label("error_is_array".to_string()));
+    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rdi, Arg64::Unsigned(7))));
+    instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
+    // call rust function
+    instructions.push(Instr::Call(JmpArg::Label("snake_error".to_string())));
+    // should be inc
+    instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
+
+    instructions.push(Instr::Label("error_index_number".to_string()));
+    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rdi, Arg64::Unsigned(8))));
+    instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
+    // call rust function
+    instructions.push(Instr::Call(JmpArg::Label("snake_error".to_string())));
+    // should be inc
+    instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
+
+    instructions.push(Instr::Label("error_index_bounds".to_string()));
+    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rdi, Arg64::Unsigned(9))));
+    instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
+    // call rust function
+    instructions.push(Instr::Call(JmpArg::Label("snake_error".to_string())));
+    // should be inc
+    instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
+
+
     
 
     instructions.push(Instr::Label("overflow".to_string()));
@@ -3020,12 +3203,12 @@ where
     let is = compile_to_instrs(&seq_p);
     return Ok(format!(
         "\
+section .data
+HEAP:    times 1024 dq 0
 section .text
 global start_here
 extern snake_error
 extern print_snake_val
-section .data
-HEAP:    times 1024 dq 0
 
 start_here:
 

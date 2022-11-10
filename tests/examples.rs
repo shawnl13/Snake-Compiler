@@ -25,11 +25,22 @@ macro_rules! mk_fail_test {
 // egg eater tests
 //mk_test!(egg_interesting, "interesting,egg", 42);
 //mk_test!(egg_other, "egg/other.egg", 2);
-mk_test!(egg_apply_to_five, "egg/applyToFive.egg", "6");
+//mk_test!(egg_apply_to_five, "egg/applyToFive.egg", "6");
 mk_test!(egg_array_simple, "egg/array_simple.egg", "3");
-mk_test!(egg_chain_array_set, "egg/chain_array_set.egg", "0");
+//mk_test!(egg_chain_array_set, "egg/chain_array_set.egg", "0");
+//
+//mk_fail_test!(egg_call_non_fun_err, "egg/call_bool_err.egg", "called a non-function");
+//mk_fail_test!(egg_arity_err, "egg/arity_err.egg", "wrong number of arguments");
 
 
+mk_fail_test!(egg_index_non_array_err, "egg/index_non_array_err.egg", "indexed into non-array");
+mk_fail_test!(egg_index_not_number_err, "egg/index_not_number_err.egg", "index not a number");
+mk_fail_test!(egg_index_bounds_err, "egg/index_bounds_err.egg", "index out of bounds");
+
+//mk_fail_test!(egg_len_not_array_err, "egg/len_err.egg", "length called with non-array");
+
+
+/*
 // diamondback tests
 mk_test!(diamondback_non_tail_fun, "dia/non_tail_fun.dia", "6");
 mk_test!(diamondback_even_odd_240, "dia/even_odd.dia", "true");
@@ -73,7 +84,7 @@ mk_test!(boa_test_sub_simple, "boa/test_sub_simple.boa","-6");
 mk_test!(boa_test_prim2_let, "boa/test_prim2_let.boa","19");
 mk_test!(boa_test_let_nested, "boa/test_let_nested.boa","2");
 mk_test!(boa_test_debug_let, "boa/test_debug_let.boa","3");
-
+*/
 
 // IMPLEMENTATION
 fn test_example_file(f: &str, expected_str: &str) -> std::io::Result<()> {

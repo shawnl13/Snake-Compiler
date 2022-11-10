@@ -84,6 +84,7 @@ extern "sysv64" fn snake_error(rdi: u64, rsi: SnakeVal) {
         7 => eprintln!("indexed into non-array: {}", sprint_snake_val(rsi)),
         8 => eprintln!("index not a number: {}", sprint_snake_val(rsi)),
         9 => eprintln!("index out of bounds: {}", sprint_snake_val(rsi)),
+        
         10 => eprintln!("length
         called with non-array, length called with non-array: {}", sprint_snake_val(rsi)),
 
