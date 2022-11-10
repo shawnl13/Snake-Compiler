@@ -2107,9 +2107,10 @@ fn sequentialize_helper(e: &Exp<u32>) -> SeqExp<()> {
             }
         }
         Exp::FunDefs { decls, body, ann } => {panic!("Tried to sequentialize a function definition")},
+
         Exp::Call(s, parameters, ann) => {
-            panic!("NYI: call sequentialize_helper");
-            /* 
+          //  panic!("NYI: call sequentialize_helper");
+            
             /* check if all parameters are  immediate
              if they are all immediate, return seq::call(s, )
 
@@ -2120,9 +2121,10 @@ fn sequentialize_helper(e: &Exp<u32>) -> SeqExp<()> {
             foo2(2)     -> let bleh = 2 in foo2(bleh)
             */
             
-            if parameters.len() == 0 {
-                return SeqExp::Call(s.to_string(), Vec::new(), ());
-            }
+            
+            /*if parameters.len() == 0 {
+                return SeqExp::CallClosure{fun: fun_to_call,args: Vec::new(),ann: ()};
+            }*/
 
             let mut new_para:Vec<ImmExp> = Vec::new();
             let mut new_para_s:Vec<String> = Vec::new();
@@ -2132,11 +2134,21 @@ fn sequentialize_helper(e: &Exp<u32>) -> SeqExp<()> {
                 new_para.push(ImmExp::Var(tmp.to_string()));
                 new_para_s.push(tmp.to_string());
             }
-            // new_para = [ImmExp(bleh1), ImmExp(bleh2), ImmExp(bleh3).....]
-            // new_para_s = [bleh1, bleh2, bleh3 ....]
             
-            //pass 0
-            let mut out = SeqExp::Call(s.to_string(), new_para, ());
+            //def a() 1 and def b() 2 in (if x a else b)()
+            //                          let fun_name_replacement = if x a else b in fun_name_replacement()
+
+            let fun_name = format!("fun_name_replacement_{}", ann);
+            let mut out = SeqExp::Let{
+                var: fun_name.to_string(),
+                bound_exp: Box::new(sequentialize_helper(s)),
+                body: Box::new(SeqExp::CallClosure{
+                    fun: ImmExp::Var(fun_name),
+                    args: new_para,
+                    ann: ()}),
+                ann: (),
+            };
+            
             // out = foo1(bleh1, bleh2, bleh3)
             // original parameters = a,b,c
             // bleh3 = c, bleh2 = b, bleh1=a
@@ -2167,23 +2179,89 @@ fn sequentialize_helper(e: &Exp<u32>) -> SeqExp<()> {
                 };
             }
 
-            return out;*/
+            return out;
         }
         Exp::Array(vec, ann) => {
-            let mut new_vec = Vec::new();
-            for curr_immexp in vec{
-                new_vec.push(return_immediate(curr_immexp).unwrap());
+            //let mut new_vec = Vec::new();
+            let mut i = 0;
+            let mut all_are_imm = true;
+            let mut imm_exp_vec = Vec::new();
+            let mut exp_let_vec = Vec::new();
+            let mut imm_vec = Vec::new();
+            for curr_exp in vec{
+                let curr_exp_is_imm = return_immediate(curr_exp).is_some();
+            
+                // array[1,x,add1(2),3] => let potato = add1(2) in array[1,x,potato,3]
+                // array[1,x] => let in array[1,x]
+                // array[1,x,add1(2),3] => let a1 = 1, a2 = x, a3 = add1(2), a4 = 3 in array[a1,a2,a3,a4]
                 
+                if (!curr_exp_is_imm) {
+                    all_are_imm = false;
+                    let name = format!("CreateArray_{}_param_{}", ann, i);
+                    exp_let_vec.push((name.to_string(), curr_exp.clone()));
+                    imm_exp_vec.push(Exp::Var(name.clone(), *ann));
+                } else {
+                    imm_exp_vec.push(curr_exp.clone());
+                    imm_vec.push(return_immediate(curr_exp).unwrap()); // only used if all values are immediates
+                }
+                i += 1;
+            }
+            if all_are_imm {
+                return SeqExp::Array(imm_vec, ());
+            } else {
+                return sequentialize_helper(&Exp::Let{
+                    bindings: exp_let_vec,
+                    body: Box::new(Exp::Array(imm_exp_vec, *ann)),
+                    ann: *ann,
+                })
             }
         }
         Exp::ArraySet{array, index, new_value, ann} => {
-            return SeqExp::ArraySet { 
-                array: return_immediate(array).unwrap(), 
-                index: return_immediate(index).unwrap(), 
-                new_value: return_immediate(new_value).unwrap(), 
-                ann: () 
-            }    
-        
+
+            let index_is_imm = return_immediate(index).is_some();
+            let new_value_is_imm = return_immediate(new_value).is_some();
+            let array_is_imm = return_immediate(array).is_some();
+            let (new_index, new_value2, new_array): (Exp<u32>, Exp<u32>, Exp<u32>);
+
+            if (index_is_imm && new_value_is_imm && array_is_imm) {
+                return SeqExp::ArraySet { 
+                    array: return_immediate(array).unwrap(), 
+                    index: return_immediate(index).unwrap(), 
+                    new_value: return_immediate(new_value).unwrap(), 
+                    ann: () 
+                }  
+            }
+            let mut let_bindings = Vec::new();
+
+            if (!index_is_imm) {
+                let name = format!("SeqExp_Arrayset_index_{}", ann);
+                let_bindings.push((name.to_string(), *index.clone()));
+                new_index = Exp::Var(name, *ann);
+            } else {
+                new_index = *index.clone();
+            }
+            if (!new_value_is_imm) {
+                let name = format!("SeqExp_Arrayset_newval_{}", ann);
+                let_bindings.push((name.to_string(), *new_value.clone()));
+                new_value2 = Exp::Var(name, *ann);
+            } else {
+                new_value2 = *new_value.clone();
+            }
+            if (!array_is_imm) {
+                let name = format!("SeqExp_Arrayset_array_{}", ann);
+                let_bindings.push((name.to_string(), *array.clone()));
+                new_array = Exp::Var(name, *ann);
+            } else {
+                new_array = *array.clone();
+            }
+            return sequentialize_helper(&Exp::Let { 
+                bindings: let_bindings, 
+                body: Box::new(Exp::ArraySet { 
+                    array: Box::new(new_array),
+                    index: Box::new(new_index), 
+                    new_value: Box::new(new_value2), 
+                    ann: *ann }), 
+                ann: *ann });
         }
         Exp::Semicolon{e1, e2, ann} => {
             return SeqExp::Let { 
@@ -2324,21 +2402,19 @@ fn if_bool_err(reg_to_check: Reg) -> Vec<Instr> {
 
 
 // List of currently used registers:
+// RSP: Points to current instruction location on stackr14
+// RBP: heap pointer?
 // RDI, RSI, RDX, RCX, R8, and R9 are System V AMD64 ABI arguments (rust calls)
 // Rax: everywhere, used to compute and return
-// R15: overwritten by prim2 and if
-// R14: overwritten by prim1::not // could be replaced by r15
+// Rbx: overwritten by prim2, if, and prim1:not
 // R10: overwritten in non-tail calls for debugging only // could be removed
 // Rdi: error codes in rust calls
 // Rsi: error faulty value in rust calls
+// R15: heap pointer (space for arrays)
 fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:bool) -> Vec<Instr> {
     let mut instructions = Vec::new();
     let ufalse: u64 = 0x7F_FF_FF_FF_FF_FF_FF_FF;
     let utrue: u64 = 0xFF_FF_FF_FF_FF_FF_FF_FF;
-  //  let u32false: u32 = 0x7F_FF_FF_FF;
-  //  let u32true: u32 = 0xFF_FF_FF_FF;
-
-    
 
     match e {
         SeqExp::Imm(e2, _ann) => {
@@ -2476,11 +2552,11 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                     
                     instructions.append(&mut logic_bool_err(Reg::Rax));
                     
-                    // store 0x8000000000000000 into r14
-                    // xor rax, r14
+                    // store 0x8000000000000000 into Rbx
+                    // xor rax, Rbx
                     //
-                    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::R14, Arg64::Unsigned(xor_mask))));
-                    instructions.push(Instr::Xor(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::R14))));
+                    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rbx, Arg64::Unsigned(xor_mask))));
+                    instructions.push(Instr::Xor(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::Rbx))));
 
                 }
                 Prim1::Print =>{
@@ -2511,12 +2587,12 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
             let is_true = format!("is_true#{}", ann);
             let done_lab = format!("done#{}", ann);
             
-            // sub(2,3) -> store 3 into rax, rax into r15, store 2 in rax, then sub r15 from rax
+            // sub(2,3) -> store 3 into rax, rax into Rbx, store 2 in rax, then sub Rbx from rax
 
             // Store imm2 into rax
             instructions.append(&mut compile_to_instrs_helper(&Box::new(SeqExp::<u32>::Imm(imm2.clone(), *ann),), env.clone(), is_tail));
-            // move rax to r15
-            instructions.push(Instr::Mov(MovArgs::ToReg(Reg::R15, Arg64::Reg(Reg::Rax))));
+            // move rax to Rbx
+            instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rbx, Arg64::Reg(Reg::Rax))));
 
             // Store imm1 into rax
             instructions.append(&mut compile_to_instrs_helper(&Box::new(SeqExp::<u32>::Imm(imm1.clone(), *ann),), env.clone(), is_tail));
@@ -2534,40 +2610,40 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                 
                 Prim2::Add => {
                     instructions.append(&mut arith_number_err(Reg::Rax));
-                    instructions.append(&mut arith_number_err(Reg::R15));
-                    instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::R15))));
+                    instructions.append(&mut arith_number_err(Reg::Rbx));
+                    instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::Rbx))));
                     instructions.push(Instr::Jo(JmpArg::Label("overflow".to_string())));
                 }
                 Prim2::Sub => {
                     instructions.append(&mut arith_number_err(Reg::Rax));
-                    instructions.append(&mut arith_number_err(Reg::R15));
-                    instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::R15))));
+                    instructions.append(&mut arith_number_err(Reg::Rbx));
+                    instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::Rbx))));
                     instructions.push(Instr::Jo(JmpArg::Label("overflow".to_string())));
                 }
                 Prim2::Mul => {
                     instructions.append(&mut arith_number_err(Reg::Rax));
-                    instructions.append(&mut arith_number_err(Reg::R15));
-                    instructions.push(Instr::IMul(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::R15))));
+                    instructions.append(&mut arith_number_err(Reg::Rbx));
+                    instructions.push(Instr::IMul(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::Rbx))));
                     instructions.push(Instr::Jo(JmpArg::Label("overflow".to_string())));
                     instructions.push(Instr::Sar(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(1))));
                     
                 }
                 Prim2::And => {
                     instructions.append(&mut logic_bool_err(Reg::Rax));
-                    instructions.append(&mut logic_bool_err(Reg::R15));
-                    instructions.push(Instr::And(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::R15))));
+                    instructions.append(&mut logic_bool_err(Reg::Rbx));
+                    instructions.push(Instr::And(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::Rbx))));
                     
                 }
                 Prim2::Or => {
                     instructions.append(&mut logic_bool_err(Reg::Rax));
-                    instructions.append(&mut logic_bool_err(Reg::R15));
-                    instructions.push(Instr::Or(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::R15))));
+                    instructions.append(&mut logic_bool_err(Reg::Rbx));
+                    instructions.push(Instr::Or(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::Rbx))));
                 }
                 Prim2::Lt => {
                     instructions.append(&mut compare_number_err(Reg::Rax));
-                    instructions.append(&mut compare_number_err(Reg::R15));
+                    instructions.append(&mut compare_number_err(Reg::Rbx));
 
-                    instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::R15))));
+                    instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::Rbx))));
                     instructions.push(Instr::Jl(JmpArg::Label(is_true.clone())));
 
                     instructions.push(Instr::Mov(
@@ -2585,9 +2661,9 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                 }
                 Prim2::Gt => {
                     instructions.append(&mut compare_number_err(Reg::Rax));
-                    instructions.append(&mut compare_number_err(Reg::R15));
+                    instructions.append(&mut compare_number_err(Reg::Rbx));
                     
-                    instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::R15))));
+                    instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::Rbx))));
                     instructions.push(Instr::Jg(JmpArg::Label(is_true.clone())));
 
                     instructions.push(Instr::Mov(
@@ -2604,9 +2680,9 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                 }
                 Prim2::Le => {
                     instructions.append(&mut compare_number_err(Reg::Rax));
-                    instructions.append(&mut compare_number_err(Reg::R15));
+                    instructions.append(&mut compare_number_err(Reg::Rbx));
 
-                    instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::R15))));
+                    instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::Rbx))));
                     instructions.push(Instr::Jle(JmpArg::Label(is_true.clone())));
 
                     instructions.push(Instr::Mov(
@@ -2625,9 +2701,9 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                 Prim2::Ge => {
                     
                     instructions.append(&mut compare_number_err(Reg::Rax));
-                    instructions.append(&mut compare_number_err(Reg::R15));
+                    instructions.append(&mut compare_number_err(Reg::Rbx));
 
-                    instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::R15))));
+                    instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::Rbx))));
                     instructions.push(Instr::Jge(JmpArg::Label(is_true.clone())));
 
                     instructions.push(Instr::Mov(
@@ -2645,7 +2721,7 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                 }
                 Prim2::Eq => {
                     
-                    instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::R15))));
+                    instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::Rbx))));
                     instructions.push(Instr::Je(JmpArg::Label(is_true.clone())));
 
                     instructions.push(Instr::Mov(
@@ -2688,7 +2764,7 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
 
         SeqExp::If { cond, thn, els, ann } => {
             //instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rdi, Arg64::Unsigned(3))));
-            instructions.push(Instr::Mov(MovArgs::ToReg(Reg::R15, Arg64::Unsigned(utrue))));
+            instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rbx, Arg64::Unsigned(utrue))));
 
             // cond is ImmExp
             let else_lab = format!("else#{}", ann);
@@ -2699,7 +2775,7 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
             instructions.append(&mut if_bool_err(Reg::Rax));
 
             // sets flags used by condional jump instructions, comparing rax to 0
-            instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::R15))));
+            instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::Rbx))));
 
             // if not equal jump to the else label
             instructions.push(Instr::Jne(JmpArg::Label(else_lab.clone())));
@@ -2776,8 +2852,46 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                 instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(space_needed))));
             }*/
         }
-        SeqExp::ArraySet { array, index, new_value, ann } => todo!(),
-        SeqExp::Array(_, _) => todo!(),
+        SeqExp::ArraySet { array, index, new_value, ann } => {
+            // move array pointer into rax
+            compile_to_instrs_helper(&SeqExp::Imm(array.clone(), *ann), env.clone(), is_tail);
+
+            // check rax is a tuple
+            // tuple is 0b001
+            
+
+
+        },
+        SeqExp::Array(vec, ann) => {
+            let size_of = vec.len() as u64;
+
+            //instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Unsigned(size_of))));
+            let memadr = MemRef{ reg: Reg::R15, offset: Offset::Constant(0) };
+            instructions.push(Instr::Mov(MovArgs::ToMem(memadr, Reg32::Unsigned(size_of as u32))));
+            
+            
+            let mut i = 1;
+            for curr_element in vec{
+                //store curr_element into rax
+                instructions.append(&mut compile_to_instrs_helper(
+                    &SeqExp::Imm(curr_element.clone(), *ann), env.clone(), is_tail)
+                );
+                // store rax onto heap
+                let memadr = MemRef{ reg: Reg::R15, offset: Offset::Constant(8*i) };
+                instructions.push(Instr::Mov(MovArgs::ToMem(memadr, Reg32::Reg(Reg::Rax))));
+                // add 8 to r15
+                i += 1;
+            }
+
+            // put array pointer into rax
+            instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Reg(Reg::R15))));
+            
+            // tag rax as array
+            instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(1))));
+
+            // increase r15 by 8*length
+            instructions.push(Instr::Add(BinArgs::ToReg(Reg::R15, Arg32::Unsigned(8*(size_of as u32 + 1)))));
+        },
         SeqExp::MakeClosure { arity, label, env, ann } => todo!(),
     }
     return instructions;
@@ -2785,7 +2899,11 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
 
 fn compile_to_instr_functions(funcs:Vec<FunDecl<SeqExp<u32>, u32>>, e: &SeqExp<u32>) -> Vec<Instr> {
     
-    let mut instructions = compile_to_instrs_helper(e, Vec::new(), true);
+    let mut instructions = Vec::new();
+
+    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::R15, Arg64::Label("HEAP".to_string()))));
+    
+    instructions = compile_to_instrs_helper(e, Vec::new(), true);
     
     let mut max_space_needed: u32 = space_needed(e) as u32; //wastes memory, but is safe
     if max_space_needed % 2 == 0{
@@ -2902,11 +3020,15 @@ where
     let is = compile_to_instrs(&seq_p);
     return Ok(format!(
         "\
-        section .text
-        global start_here
-        extern snake_error
-        extern print_snake_val
+section .text
+global start_here
+extern snake_error
+extern print_snake_val
+section .data
+HEAP:    times 1024 dq 0
+
 start_here:
+
 {}       
 ",instrs_to_string(&is)));
 }

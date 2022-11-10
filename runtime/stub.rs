@@ -26,6 +26,7 @@ static INT_TAG: u64 = 0x00_00_00_00_00_00_00_01;
 static SNAKE_TRU: SnakeVal = SnakeVal(0xFF_FF_FF_FF_FF_FF_FF_FF);
 static SNAKE_FLS: SnakeVal = SnakeVal(0x7F_FF_FF_FF_FF_FF_FF_FF);
 
+
 #[link(name = "compiled_code", kind = "static")]
 extern "sysv64" {
 
@@ -84,7 +85,7 @@ extern "sysv64" fn snake_error(rdi: u64, rsi: SnakeVal) {
         8 => eprintln!("index not a number: {}", sprint_snake_val(rsi)),
         9 => eprintln!("index out of bounds: {}", sprint_snake_val(rsi)),
         10 => eprintln!("length
-        called with non-array: {}", sprint_snake_val(rsi)),
+        called with non-array, length called with non-array: {}", sprint_snake_val(rsi)),
 
 
         _ => eprintln!("Invalid error code: rsi: {}, rdi: {}", sprint_snake_val(rsi), rdi),
