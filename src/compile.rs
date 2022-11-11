@@ -1413,7 +1413,7 @@ fn lift_convert_lambdas<ann: std::fmt::Display + std::marker::Copy>(e: Exp<ann>)
                 body: Exp::Var(name.clone(), ann), 
                 ann: ann
             };
-            return Exp::FunDefs { decls: vec![new_decl], body: body, ann: ann };
+            return Exp::FunDefs { decls: vec![new_decl], body: Box::new(lift_convert_lambdas(*body)), ann: ann };
         }
         Exp::MakeClosure{arity, label, env, ann} => {
         return Exp::MakeClosure { arity: arity, label: label, env: Box::new(lift_convert_lambdas(*env)), ann: ann };
@@ -2422,12 +2422,15 @@ fn compare_number_err(reg_to_check: Reg) -> Vec<Instr> {
 
 
 fn logic_bool_err(reg_to_check: Reg) -> Vec<Instr> {
-    // test RAX, 0x0000000000000001 ;; check only the tag bit of the value
-    // jnz error_not_number         ;; if the bit is set, go to some centralized error handler
+    //let ufalse: u64 = 0x7F_FF_FF_FF_FF_FF_FF_FF;
+    //let utrue: u64 = 0xFF_FF_FF_FF_FF_FF_FF_FF;
     let mut instructions = Vec::new();
-    instructions.push(Instr::Test(BinArgs::ToReg(reg_to_check, Arg32::Unsigned(7))));
     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rsi, Arg64::Reg(reg_to_check))));
-    instructions.push(Instr::Jz(JmpArg::Label("error_logic_bool".to_string())));
+
+    instructions.push(Instr::And(BinArgs::ToReg(Reg::Rsi, Arg32::Unsigned(7))));
+    instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rsi, Arg32::Unsigned(7))));
+    instructions.push(Instr::Jne(JmpArg::Label("error_logic_bool".to_string())));
+
     return instructions;
 }
 
@@ -2436,9 +2439,11 @@ fn if_bool_err(reg_to_check: Reg) -> Vec<Instr> {
     // test RAX, 0x077777777777777 ;; check only the tag bit of the value
     // jnz error_not_number         ;; if the bit is set, go to some centralized error handler
     let mut instructions = Vec::new();
-    instructions.push(Instr::Test(BinArgs::ToReg(reg_to_check, Arg32::Unsigned(7))));
+
     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rsi, Arg64::Reg(reg_to_check))));
-    instructions.push(Instr::Jz(JmpArg::Label("error_if_bool".to_string())));
+    instructions.push(Instr::And(BinArgs::ToReg(Reg::Rsi, Arg32::Unsigned(7))));
+    instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rsi, Arg32::Unsigned(7))));
+    instructions.push(Instr::Jne(JmpArg::Label("error_if_bool".to_string())));
     return instructions;
 }
 
@@ -2473,6 +2478,18 @@ fn is_array(reg_to_check: Reg) -> Vec<Instr> {
     return instructions;
 }
 
+fn is_array_len(reg_to_check: Reg) -> Vec<Instr> {
+    let mut instructions = Vec::new();
+    // story array pointer into rsi
+    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rsi, Arg64::Reg(reg_to_check))));
+    instructions.push(Instr::And(BinArgs::ToReg(Reg::Rsi, Arg32::Unsigned(7))));
+    // compare to 0x0000000000000001
+    instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rsi, Arg32::Unsigned(1))));
+    // jump if not equal
+    instructions.push(Instr::Jne(JmpArg::Label("error_is_array_len".to_string())));
+    return instructions;
+}
+
 fn index_number_err(reg_to_check: Reg) -> Vec<Instr> {
     // test RAX, 0x0000000000000001 ;; check only the tag bit of the value
     // jnz error_not_number         ;; if the bit is set, go to some centralized error handler
@@ -2504,6 +2521,11 @@ fn index_bounds_err(reg_to_check: Reg, array_pointer: Reg) -> Vec<Instr> {
     //jmp if less than or equal (jle)
     instructions.push(Instr::Jle(JmpArg::Label("error_index_bounds".to_string())));
     
+    //jump if <0
+    // cmp between rsi(length) and reg_to_check(index) which is Rbx
+    instructions.push(Instr::Cmp(BinArgs::ToReg(reg_to_check, Arg32::Unsigned(0)))); 
+    instructions.push(Instr::Jl(JmpArg::Label("error_index_bounds".to_string())));
+
     return instructions;
 }
 
@@ -2565,29 +2587,7 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                         reg: Reg::Rsp,
                         offset: Offset::Constant(calculated_offset),
                     };
-                    // store 32 representation from mem into rax
-                    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Mem(address))));
-
-                    // if rax is a number, jmp to done
-             //       instructions.push(Instr::Test(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(1))));
-             //       instructions.push(Instr::Jnz("done_lab".to_string()));
-                    
-             //       instructions.push(Instr::Shl(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(32))));
-             //       instructions.push(Instr::Or(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(0xFF_FF_FF_FF))));
-                    
-                    // if 32bit bool
-                    // have 0x000000007FFFFFFF, want 0x7FFFFFFFFFFFFFFF
-                    // bit shift -> 0x7FFFFFFF00000000
-                    // bit or 0x00000000FFFFFFFF -> 0x7FFFFFFF_FFFFFFFF
-
-                    // if rax is u32false, store ufalse (64 bit) into rax
-                    // if rax is u32true, store utrue (64 bit) into rax
-
-                    // for future me: if adding more data types makes this annoying, replace the bit
-                    //  shifting with a bunch of bit and masks, cmp, and je
-
-                    // note: Thought only 32 bits could be stored into memory (arg32), so some translation was needed
-                    
+                    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Mem(address))));                    
                 }
             } 
         }
@@ -2682,8 +2682,53 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                     instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
 
                 }
-                Prim1::Length => todo!(),
-                Prim1::IsArray => todo!(),
+                Prim1::Length => {
+                    // check if it is an array
+                    instructions.append(&mut is_array_len(Reg::Rax));
+
+                    // untag the array pointer
+                    instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(1))));
+
+                    // mov the first element of the array (0th) to rax
+                    let address = MemRef{
+                        reg: Reg::Rax,
+                        offset: Offset::Constant(0),
+                    };
+                    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Mem(address))));
+
+                    // convert into a snake_Val number (x2)
+                    instructions.push(Instr::IMul(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(2))));
+
+
+                },
+                Prim1::IsArray => {
+                    let is_array = format!("is_array#{}", ann);
+                    
+                    // test RAX, 0x0000000000000001 ;; check only the tag bit of the value
+                    // jnz error_not_number         ;; if the bit is set, go to some centralized error handler
+                    let mut instructions = Vec::new();
+
+                    // story array pointer into rbx
+                    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rbx, Arg64::Reg(Reg::Rax))));
+
+                    instructions.push(Instr::And(BinArgs::ToReg(Reg::Rbx, Arg32::Unsigned(7))));
+                    
+                    // compare to 0x0000000000000001
+                    instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rbx, Arg32::Unsigned(1))));
+    
+                    // jump if not equal
+                    instructions.push(Instr::Jne(JmpArg::Label(is_array.clone())));
+                    
+                    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Unsigned(utrue))));
+                    instructions.push(Instr::Jmp(JmpArg::Label(done_lab.clone())));
+
+                    instructions.push(Instr::Label(is_array.clone()));
+                    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Unsigned(ufalse))));
+                    instructions.push(Instr::Label(done_lab.clone()));
+
+                    return instructions;
+
+                },
                 Prim1::IsFun => todo!(),
                 
             }
@@ -3021,14 +3066,19 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
             // check that index is in bounds
             instructions.append(&mut index_bounds_err(Reg::Rbx, Reg::Rax));
 
+            // untag index (divide Rbx by 2)
+            instructions.push(Instr::Shr(BinArgs::ToReg(Reg::Rbx, Arg32::Unsigned(1))));
+            
+            
             // write the r14 to array[index]
             let mem = MemRef{ 
                 reg: Reg::Rax, 
                 offset: Offset::Computed { reg: Reg::Rbx, factor: 8, constant: 8 } 
             };
             instructions.push(Instr::Mov(MovArgs::ToMem(mem, Reg32::Reg(Reg::R14))));
-            
 
+            // Retag Rax
+            instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(1))));
         },
         SeqExp::Array(vec, ann) => {
             let size_of = vec.len() as u64;
@@ -3153,6 +3203,14 @@ fn compile_to_instr_functions(funcs:Vec<FunDecl<SeqExp<u32>, u32>>, e: &SeqExp<u
     // should be inc
     instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
 
+    instructions.push(Instr::Label("error_is_array_len".to_string()));
+    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rdi, Arg64::Unsigned(10))));
+    instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
+    // call rust function
+    instructions.push(Instr::Call(JmpArg::Label("snake_error".to_string())));
+    // should be inc
+    instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
+
     instructions.push(Instr::Label("error_index_number".to_string()));
     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rdi, Arg64::Unsigned(8))));
     instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
@@ -3168,7 +3226,7 @@ fn compile_to_instr_functions(funcs:Vec<FunDecl<SeqExp<u32>, u32>>, e: &SeqExp<u
     instructions.push(Instr::Call(JmpArg::Label("snake_error".to_string())));
     // should be inc
     instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
-
+    
 
     
 

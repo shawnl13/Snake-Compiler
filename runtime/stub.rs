@@ -1,3 +1,4 @@
+
 #[repr(C)]
 #[derive(PartialEq, Eq, Copy, Clone)]
 struct SnakeVal(u64);
@@ -41,7 +42,10 @@ fn unsigned_to_signed(x: u64) -> i64 {
     i64::from_le_bytes(x.to_le_bytes())
 }
 
-fn sprint_snake_val(x: SnakeVal) -> String {
+fn sprint_snake_val(x: SnakeVal, mut seen_arrays: Vec<u64>) -> String {
+   // println!("Entering sprint_snake_val with: {}", x.0);
+
+    let mut output = "".to_string();
     if x.0 & INT_TAG == 0 {
         // it's a number
         format!("{}", unsigned_to_signed(x.0) >> 1)
@@ -49,14 +53,53 @@ fn sprint_snake_val(x: SnakeVal) -> String {
         String::from("true")
     } else if x == SNAKE_FLS {
         String::from("false")
+    } else if x.0 & 7 == 1 { // array
+        //println!("Printing an array");
+        unsafe{
+            if seen_arrays.contains(&x.0) { return "<loop>".to_string(); }
+            seen_arrays.push(x.0);
+            let snake_array = load_snake_array(std::mem::transmute(x.0-1));
+            let length = snake_array.size as usize;
+            let p = snake_array.elts; // points to the first element of array
+            let mut i = 0 as usize;
+            output += "[";
+            while i < length{
+                //let e:SnakeVal = *p;//std::mem::transmute::<*const SnakeVal>(p);// store thing that p points to
+                
+                output += &sprint_snake_val(*p.add(i), seen_arrays.clone());
+                if i+1<length {output += ", ";}
+                i += 1;
+            }
+            output += "]";
+            
+            
+
+            /* 
+            let pair = [ 0 , 1 ] in
+            pair[1] := pair;
+            pair
+            should print: "[0, <loop>]"
+
+
+            let pair = [ 0 , 1 ] in
+            let second = [pair, pair] in
+            second
+            should print: "[[0, 1], [0, 1]]""        */
+            
+
+            return output;
+        }
+    } else if x.0 & 7 == 3 { // closure
+        return "<closure>".to_string();
     } else {
         format!("Invalid snake value 0x{:x}", x.0)
     }
+    
 }
 
 #[export_name = "\x01print_snake_val"]
 extern "sysv64" fn print_snake_val(v: SnakeVal) -> SnakeVal {
-    println!("{}", sprint_snake_val(v));
+    println!("{}", sprint_snake_val(v, Vec::new()));
     return v;
 }
 
@@ -72,24 +115,24 @@ extern "sysv64" fn snake_error(rdi: u64, rsi: SnakeVal) {
     // rsi: faulty number/bool
     println!("getting to snake_error");
     match rdi {
-        0 => eprintln!("arithmetic expected a number: {}", sprint_snake_val(rsi)),
-        1 => eprintln!("comparison expected a number: {}", sprint_snake_val(rsi)),
+        0 => eprintln!("arithmetic expected a number: {}", sprint_snake_val(rsi, Vec::new())),
+        1 => eprintln!("comparison expected a number: {}", sprint_snake_val(rsi, Vec::new())),
         2 => eprintln!("overflow"),
-        3 => eprintln!("if expected a boolean: {}", sprint_snake_val(rsi)),
-        4 => eprintln!("logic expected a boolean: {}", sprint_snake_val(rsi)),
+        3 => eprintln!("if expected a boolean: {}", sprint_snake_val(rsi, Vec::new())),
+        4 => eprintln!("logic expected a boolean"),
 
-        5 => eprintln!("called a non-function: {}", sprint_snake_val(rsi)),
-        6 => eprintln!("wrong number of arguments: {}", sprint_snake_val(rsi)),
+        5 => eprintln!("called a non-function: {}", sprint_snake_val(rsi, Vec::new())),
+        6 => eprintln!("wrong number of arguments: {}", sprint_snake_val(rsi, Vec::new())),
 
-        7 => eprintln!("indexed into non-array: {}", sprint_snake_val(rsi)),
-        8 => eprintln!("index not a number: {}", sprint_snake_val(rsi)),
-        9 => eprintln!("index out of bounds: {}", sprint_snake_val(rsi)),
+        7 => eprintln!("indexed into non-array: {}", sprint_snake_val(rsi, Vec::new())),
+        8 => eprintln!("index not a number: {}", sprint_snake_val(rsi, Vec::new())),
+        9 => eprintln!("index out of bounds: {}", sprint_snake_val(rsi, Vec::new())),
         
         10 => eprintln!("length
-        called with non-array, length called with non-array: {}", sprint_snake_val(rsi)),
+        called with non-array, length called with non-array: {}", sprint_snake_val(rsi, Vec::new())),
 
 
-        _ => eprintln!("Invalid error code: rsi: {}, rdi: {}", sprint_snake_val(rsi), rdi),
+        _ => eprintln!("Invalid error code: rsi: {}, rdi: {}", sprint_snake_val(rsi, Vec::new()), rdi),
     }
 
     std::process::exit(1);
@@ -113,5 +156,5 @@ extern "sysv64" fn snake_equals() {
 
 fn main() {
     let output = unsafe { start_here() };
-    println!("{}", sprint_snake_val(output));
+    println!("{}", sprint_snake_val(output, Vec::new()));
 }

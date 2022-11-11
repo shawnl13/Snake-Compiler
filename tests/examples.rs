@@ -24,22 +24,31 @@ macro_rules! mk_fail_test {
  */
 
 // egg eater tests
+mk_test!(egg_print_array_simple, "egg/print_array.egg", "[4, false, [true, 3]]");
+mk_test!(looped_array, "egg/looped_array.egg", "[0, <loop>]");
+
+
 //mk_test!(egg_interesting, "interesting,egg", 42);
 //mk_test!(egg_other, "egg/other.egg", 2);
 //mk_test!(egg_apply_to_five, "egg/applyToFive.egg", "6");
 mk_test!(egg_array_simple, "egg/array_simple.egg", "5");
 mk_test!(egg_chain_array_set, "egg/chain_array_set.egg", "5");
 mk_test!(egg_chain_array_set_complicated, "egg/chain_array_set copy.egg", "0");
+mk_test!(egg_create_array, "egg/create_array.egg", "1");
+mk_test!(egg_len_simple, "egg/len_simple.egg", "2");
+
+mk_test!(egg_recursive_arrays_interesting, "interesting.egg", "8");
+
+
 //
 //mk_fail_test!(egg_call_non_fun_err, "egg/call_bool_err.egg", "called a non-function");
 //mk_fail_test!(egg_arity_err, "egg/arity_err.egg", "wrong number of arguments");
-mk_test!(egg_create_array, "egg/create_array.egg", "1");
 
 mk_fail_test!(egg_index_non_array_err, "egg/index_non_array_err.egg", "indexed into non-array");
 mk_fail_test!(egg_index_not_number_err, "egg/index_not_number_err.egg", "index not a number");
 mk_fail_test!(egg_index_bounds_err, "egg/index_bounds_err.egg", "index out of bounds");
 
-//mk_fail_test!(egg_len_not_array_err, "egg/len_err.egg", "length called with non-array");
+mk_fail_test!(egg_len_not_array_err, "egg/len_err.egg", "length called with non-array");
 
 
 
@@ -61,6 +70,7 @@ mk_test!(diamondback_shadow_regression2, "dia/let_regression.boa", "2");
 // cobra tests:
 mk_test!(cobra_test_if_simple, "cobra/test_if_simple.cobra", "6");
 mk_fail_test!(cobra_test_arith_err, "cobra/arth_num_err.cobra", "arithmetic expected a number");
+mk_fail_test!(cobra_not_7_error, "cobra/not_7.cobra", "logic expected a boolean");
 mk_test!(cobra_test_not_true, "cobra/test_not_true.cobra", "false");
 mk_test!(cobra_test_print_2, "cobra/test_print_2.cobra", "2\n4\n4");
 mk_test!(cobra_test_print_simple, "cobra/test_print_simple.cobra", "5\n5");
