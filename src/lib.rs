@@ -1,3 +1,4 @@
+#![allow(warnings)]
 pub mod asm;
 pub mod compile;
 pub mod interp;

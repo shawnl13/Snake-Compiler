@@ -1,3 +1,9 @@
+#![allow(dead_code)]
+#![allow(unused_variables)]
+#![allow(warnings)]
+
+
+
 use crate::asm::instrs_to_string;
 use crate::asm::{Arg32, Arg64, BinArgs, Instr, JmpArg, MemRef, MovArgs, Offset, Reg, Reg32};
 use crate::syntax::{Exp, FunDecl, ImmExp, Prim1, Prim2, SeqExp, SeqProg, SurfFunDecl, SurfProg};
@@ -6,6 +12,9 @@ use std::collections::HashSet;
 use crate::span::Span1;
 use std::convert::TryInto;
 use std::collections::HashMap;
+
+
+
 
 fn usize_to_i32(x: usize) -> i32 {
     x.try_into().unwrap()
@@ -2860,7 +2869,10 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                     // find where the value is (array + index *8 + 1)
                    // instructions.push(Instr::Mul(BinArgs::ToReg(Reg::Rbx, Arg32::Unsigned(8))));
                    // instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rax, Arg32::Reg(Reg::Rbx))));
-                    
+                   
+                   // divide rbx by 2 
+                   instructions.push(Instr::Sar(BinArgs::ToReg(Reg::Rbx, Arg32::Unsigned(1))));
+
                     // write the value from array[index] to rax
                     let mem = MemRef{ 
                         reg: Reg::Rax, 
@@ -3058,8 +3070,16 @@ fn compile_to_instr_functions(funcs:Vec<FunDecl<SeqExp<u32>, u32>>, e: &SeqExp<u
     let mut instructions = Vec::new();
 
     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::R15, Arg64::Label("HEAP".to_string()))));
+    // add 7
+    /*instructions.push(Instr::Add(BinArgs::ToReg(Reg::R15, Arg32::Unsigned(7))));
+    // round down to nearest multiple of 8
+    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rbx, Arg64::Unsigned(0xFF_FF_FF_FF_FF_FF_FF_F7))));
+
+    instructions.push(Instr::And(BinArgs::ToReg(Reg::R15, Arg32::Reg(Reg::Rbx))));*/
+
+
     
-    instructions = compile_to_instrs_helper(e, Vec::new(), true);
+    instructions.append(&mut compile_to_instrs_helper(e, Vec::new(), true));
     
     let mut max_space_needed: u32 = space_needed(e) as u32; //wastes memory, but is safe
     if max_space_needed % 2 == 0{

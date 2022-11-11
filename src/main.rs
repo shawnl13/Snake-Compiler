@@ -1,3 +1,4 @@
+#![allow(warnings)]
 use snake::runner::*;
 use std::path::Path;
 
