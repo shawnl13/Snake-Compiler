@@ -1,0 +1,7 @@
+let Var_0 = Num(1), Var_1 = Num(2), 
+Var_2 = let EnvArr_Lambda5 = Array( vec![Var(Var_0), Var(Var_1), Num(0), ], ann: 5), 
+Lambda5 = MakeClosure{arity: 1, label: Lambda5, env: Var(EnvArr_Lambda5), ann: 7} 
+in Semicolon{
+    e1: ArraySet{array: Var(EnvArr_Lambda5), index: Num(2), new_value: Var(Lambda5), ann: 11}, 
+    e2: Var(Lambda5), ann: 13} 
+    in Call(Var(Var_2), vec![Num(5),])

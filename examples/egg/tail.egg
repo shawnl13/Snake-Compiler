@@ -1,0 +1,8 @@
+def applyToFive(it):
+  it
+in
+
+def junk():
+  1
+in
+applyToFive(2)

@@ -281,6 +281,14 @@ where
 }
 
 
+fn print_helper_decls<'a>(defs: &Vec<FunDecl<Exp<u32>, u32>>) -> String {
+    let mut out = "".to_string();
+    for x in defs{
+        out += &format!("\n{}({}) body:\n{}",x.name,x.parameters.join(", "), print_helper(&x.body));
+    }
+    return out;
+}
+
 fn print_helper<'a>(e: &'a Exp<u32>) -> String {
     let mut out = "".to_string();
     match e{
@@ -296,32 +304,32 @@ fn print_helper<'a>(e: &'a Exp<u32>) -> String {
         Exp::Prim1(p, x, a) => {
             out += &format!("Prim1(Prim1::");
             match p{
-                Add1 => {out += &format!("Add1({}))", print_helper(x));},
-                Sub1 => {out += &format!("Sub1({}))", print_helper(x));},
-                Not => {out += &format!("Not({}))", print_helper(x));},
-                Print => {out += &format!("Print({}))", print_helper(x));},
-                IsBool => {out += &format!("IsBool({}))", print_helper(x));},
-                IsNum => {out += &format!("IsNum({}))", print_helper(x));},
-                Length => {out += &format!("Length({}))", print_helper(x));},
-                IsArray => {out += &format!("IsArray({})", print_helper(x));},
-                IsFun => {out += &format!("IsFun({}))", print_helper(x));}, 
+                Prim1::Add1 => {out += &format!("Add1({}))", print_helper(x));},
+                Prim1::Sub1 => {out += &format!("Sub1({}))", print_helper(x));},
+                Prim1::Not => {out += &format!("Not({}))", print_helper(x));},
+                Prim1::Print => {out += &format!("Print({}))", print_helper(x));},
+                Prim1::IsBool => {out += &format!("IsBool({}))", print_helper(x));},
+                Prim1::IsNum => {out += &format!("IsNum({}))", print_helper(x));},
+                Prim1::Length => {out += &format!("Length({}))", print_helper(x));},
+                Prim1::IsArray => {out += &format!("IsArray({})", print_helper(x));},
+                Prim1::IsFun => {out += &format!("IsFun({}))", print_helper(x));}, 
             }
         },
         Exp::Prim2(p, e1, e2, a) => {
             out += &format!("Prim2(Prim2::");
             match p{
-                Add => {out += &format!("Add({},{}))", print_helper(e1), print_helper(e2));},
-                Sub => {out += &format!("Sub({},{})", print_helper(e1), print_helper(e2));},
-                Mul => {out += &format!("Mul({},{}))", print_helper(e1), print_helper(e2));},
-                And => {out += &format!("And({},{}))", print_helper(e1), print_helper(e2));},
-                Or => {out += &format!("Or({},{}))", print_helper(e1), print_helper(e2));},
-                Lt => {out += &format!("Lt({},{})", print_helper(e1), print_helper(e2));},
-                Gt => {out += &format!("Gt({},{}))", print_helper(e1), print_helper(e2));},
-                Le => {out += &format!("Le({},{}))", print_helper(e1), print_helper(e2));},
-                Ge => {out += &format!("Ge({},{}))", print_helper(e1), print_helper(e2));},
-                Eq => {out += &format!("Eq({},{}))", print_helper(e1), print_helper(e2));},
-                Neq => {out += &format!("Neq({},{}))", print_helper(e1), print_helper(e2));},
-                ArrayGet => {out += &format!("ArrayGet({},{}))", print_helper(e1), print_helper(e2));}
+                Prim2::Add => {out += &format!("Add({},{}))", print_helper(e1), print_helper(e2));},
+                Prim2::Sub => {out += &format!("Sub({},{})", print_helper(e1), print_helper(e2));},
+                Prim2::Mul => {out += &format!("Mul({},{}))", print_helper(e1), print_helper(e2));},
+                Prim2::And => {out += &format!("And({},{}))", print_helper(e1), print_helper(e2));},
+                Prim2::Or => {out += &format!("Or({},{}))", print_helper(e1), print_helper(e2));},
+                Prim2::Lt => {out += &format!("Lt({},{})", print_helper(e1), print_helper(e2));},
+                Prim2::Gt => {out += &format!("Gt({},{}))", print_helper(e1), print_helper(e2));},
+                Prim2::Le => {out += &format!("Le({},{}))", print_helper(e1), print_helper(e2));},
+                Prim2::Ge => {out += &format!("Ge({},{}))", print_helper(e1), print_helper(e2));},
+                Prim2::Eq => {out += &format!("Eq({},{}))", print_helper(e1), print_helper(e2));},
+                Prim2::Neq => {out += &format!("Neq({},{}))", print_helper(e1), print_helper(e2));},
+                Prim2::ArrayGet => {out += &format!("ArrayGet({},{}))", print_helper(e1), print_helper(e2));}
             }
         },
         Exp::Let { bindings, body, ann } => {
@@ -340,7 +348,7 @@ fn print_helper<'a>(e: &'a Exp<u32>) -> String {
             out += "FunDefs {{ vec![";
             let mut tmp = "".to_string();
             for x in decls{
-                out += &format!("FunDecl{{name: {}, body: {}, ann: {}}}", x.name, print_helper(&x.body), x.ann);
+                out += &format!("FunDecl{{name: {}, body: {}, ann: {} }}", x.name, print_helper(&x.body), x.ann);
             } 
             out += &format!("], body: {}, ann: {} }}", print_helper(body), ann);
         },
@@ -945,7 +953,7 @@ where
 
 fn uni_helper(e: &Exp<u32>, mut new_vars: HashMap<String,String>, 
     mut new_funs: HashMap<String,String>, mut count: (usize, usize) )
- -> (Exp<()>, HashMap<String,String>){
+ -> (Exp<u32>, HashMap<String,String>){
     /*
     let x = 2 in
         def asdf(a):
@@ -956,32 +964,37 @@ fn uni_helper(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
     
     */
     match e {
-        Exp::Num(value, _) => {return (Exp::Num(*value,()), new_funs);},
-        Exp::Bool(x, _) => {return (Exp::Bool(*x, ()), new_funs);},
-        Exp::Var(s, _) => {
+        Exp::Num(value, a) => {return (Exp::Num(*value,a.clone()), new_funs);},
+        Exp::Bool(x, a) => {return (Exp::Bool(*x, a.clone()), new_funs);},
+        Exp::Var(s, a) => {
             let x;
             if new_vars.get(s).is_some() {
                 x = new_vars.get(s).unwrap().to_string();
             }
-            else {
+            else if new_funs.get(s).is_some(){
                 x = new_funs.get(s).unwrap().to_string();
+            } else {
+                let funs : Vec<String> = new_funs.into_keys().collect();
+                let vars : Vec<String> = new_vars.into_keys().collect();
+                panic!("uni_helper var neither new_funs [{}] nor new_vars [{}] contains {}",
+                 funs.join(","), vars.join(","), s);
             }
             
-            return (Exp::Var(x, ()), new_funs);
+            return (Exp::Var(x, a.clone()), new_funs);
         },
-        Exp::Prim1(p, e, _) => {
+        Exp::Prim1(p, e, ann) => {
             let mut exp;
             (exp, new_funs) = uni_helper(e, new_vars.clone(), new_funs, count);
-            return (Exp::Prim1(*p, Box::new(exp), ()), new_funs);
+            return (Exp::Prim1(*p, Box::new(exp), ann.clone()), new_funs);
         },
-        Exp::Prim2(p, e1, e2, _) => {
+        Exp::Prim2(p, e1, e2, a) => {
             let mut exp1; let mut exp2;
             (exp1, new_funs) = uni_helper(e1, new_vars.clone(), new_funs, count);
             (exp2, new_funs) = uni_helper(e2, new_vars.clone(), new_funs, count);
-            return (Exp::Prim2(*p, Box::new(exp1), Box::new(exp2), ()), new_funs);
+            return (Exp::Prim2(*p, Box::new(exp1), Box::new(exp2), a.clone()), new_funs);
         },
         Exp::Let { bindings, body, ann } => {
-            let mut new_bindings:Vec<(String, Exp<()>)> = Vec::new();
+            let mut new_bindings:Vec<(String, Exp<u32>)> = Vec::new();
             let old_vars = new_vars.clone();
             for binding in bindings {
                 let mut temp;
@@ -993,7 +1006,7 @@ fn uni_helper(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
             }
             let mut new_body;
             (new_body, new_funs) = uni_helper(body, new_vars.clone(), new_funs, count);
-            return (Exp::Let { bindings: new_bindings, body: Box::new(new_body), ann: () }, new_funs);
+            return (Exp::Let { bindings: new_bindings, body: Box::new(new_body), ann: ann.clone() }, new_funs);
         },
         Exp::If { cond, thn, els, ann } => {
             let mut c; let mut t; let mut e;
@@ -1003,11 +1016,11 @@ fn uni_helper(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
             return (Exp::If{cond: Box::new(c), 
                             thn: Box::new(t), 
                             els: Box::new(e),
-                            ann: (),}, new_funs);
+                            ann: *ann,}, new_funs);
         }
         
         Exp::FunDefs { decls, body, ann } => {
-            let mut new_decls:Vec<FunDecl<Exp<()>, ()>> = Vec::new();
+            let mut new_decls:Vec<FunDecl<Exp<u32>, u32>> = Vec::new();
             let old_vars = new_vars.clone();
             for curr_decl in decls{
                 // for each function declaration, give the funcion a new name
@@ -1027,44 +1040,29 @@ fn uni_helper(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
                 // rename all the varibles inside the body of current declaration
                 let temp_exp;
                 (temp_exp, new_funs) = uni_helper(&curr_decl.body, new_vars.clone(), new_funs, count);
-                new_decls.push(FunDecl { name: new_func_name, parameters: new_parameters, body: temp_exp, ann: () });
+                new_decls.push(FunDecl { name: new_func_name, parameters: new_parameters, body: temp_exp, ann: ann.clone() });
             }
 
             let temp_exp;
             (temp_exp, new_funs) = uni_helper(body, old_vars.clone(), new_funs, count);
             return (Exp::FunDefs{decls: new_decls,
                 body: Box::new(temp_exp),
-                ann: ()}, new_funs);
+                ann: ann.clone()}, new_funs);
 
         },
-        Exp::Call(s, a, ann) => {
-            let fun_name;
-            match *s.clone(){
-                Exp::Var(x, _) => {
-                    /*
-                    if new_vars.contains_key(&x.to_string()) {
-                        fun_name = Exp::Var(new_vars.get(&x.to_string()).unwrap().to_string(), ());
-                    } else if new_funs.contains_key(&x.to_string()){
-                        fun_name = Exp::Var(new_funs.get(&x.to_string()).unwrap().to_string(), ());
-                    } else {
-                        panic!("neither new_vars nor new_funs contains {}", x);
-                    }*/
-                    fun_name = Exp::Var(x.to_string(), ());
-                }
-                _ => {panic!("uni_helper calling something not var");}
-            }
-
-
-            let mut new_parameters:Vec<Exp<()>> = Vec::new();
+        Exp::Call(e, a, ann) => {
+            //let new_e;
+            //(new_e, new_funs) = uni_helper(e, new_vars.clone(), new_funs, count);
+            let mut new_parameters:Vec<Exp<u32>> = Vec::new();
             for cur_p in a{
                 let renamed_para;
                 (renamed_para, new_funs) = uni_helper(cur_p, new_vars.clone(), new_funs, count);
                 new_parameters.push(renamed_para);
             }
-            return (Exp::Call(Box::new(fun_name), new_parameters, ()), new_funs);
+            return (Exp::Call(e.clone(), new_parameters, ann.clone()), new_funs);
         }
         Exp::Array(vec, ann) => {
-            let mut new_vec: Vec<Exp<()>> = Vec::new();
+            let mut new_vec: Vec<Exp<u32>> = Vec::new();
             //let mut new_vars: HashSet<&String> = HashSet::new();
 
             for curr_exp in vec{
@@ -1074,7 +1072,7 @@ fn uni_helper(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
                 new_vec.push(x.0);
 
             }
-            return ((Exp::Array(new_vec, ())), new_funs);
+            return ((Exp::Array(new_vec, ann.clone())), new_funs);
         }
         Exp::ArraySet{array, index, new_value, ann} => {
             //panic!("nyi:uni_helper arrayset");
@@ -1086,13 +1084,13 @@ fn uni_helper(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
                 array: Box::new(new_array), 
                 index: Box::new(new_index), 
                 new_value: Box::new(new_value2), 
-                ann: ()}, new_funs);
+                ann: *ann}, new_funs);
         }
         Exp::Semicolon{e1, e2, ann} => {
             let (new_e1, new_e2);
             (new_e1, new_funs) = uni_helper(e1, new_vars.clone(), new_funs, count);
             (new_e2, new_funs) = uni_helper(e2, new_vars.clone(), new_funs, count);
-            return (Exp::Semicolon { e1: Box::new(new_e1), e2: Box::new(new_e2), ann: (),},new_funs)
+            return (Exp::Semicolon { e1: Box::new(new_e1), e2: Box::new(new_e2), ann: *ann,},new_funs)
         }
         Exp::Lambda{parameters, body, ann} => {
             let mut new_parameters:Vec<String> = Vec::new();
@@ -1106,7 +1104,7 @@ fn uni_helper(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
             let new_body;
             (new_body, new_funs) = uni_helper(&body, new_vars.clone(), new_funs, count);
 
-            return (Exp::Lambda{parameters: new_parameters, body: Box::new(new_body), ann: ()}, new_funs);
+            return (Exp::Lambda{parameters: new_parameters, body: Box::new(new_body), ann: *ann}, new_funs);
         }
         Exp::MakeClosure{arity, label, env, ann} => {
             panic!("MakeClosure in unqi_helper");
@@ -1202,7 +1200,7 @@ fn uni_helper2(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
 
         },
         Exp::Call(fun, a, _) => {
-            let fun_name;
+            /*let fun_name;
             match *fun.clone(){
                 Exp::Var(x, _) => {
                     if new_funs.contains_key(&x.to_string()) {
@@ -1216,14 +1214,16 @@ fn uni_helper2(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
                     }
                 }
                 _ => {panic!("uni_helper2 calling something not var");}
-            }
+            }*/
+            let new_e;
+            (new_e, new_funs) = uni_helper2(fun, new_vars.clone(), new_funs, count);
             let mut new_parameters:Vec<Exp<()>> = Vec::new();
             for cur_p in a{
                 let renamed_para;
                 (renamed_para, new_funs) = uni_helper2(cur_p, new_vars.clone(), new_funs, count);
                 new_parameters.push(renamed_para);
             }
-            return (Exp::Call(Box::new(fun_name), new_parameters, ()), new_funs);
+            return (Exp::Call(Box::new(new_e), new_parameters, ()), new_funs);
         }
         Exp::Array(vec, ann) => {
             let mut new_vec: Vec<Exp<()>> = Vec::new();
@@ -1399,14 +1399,14 @@ fn uniquify(e: &Exp<u32>) -> Exp<()> {
     */
     let (a, funs) = uni_helper(&e.clone(), HashMap::new(), HashMap::new(), (0,0));
     if true {
-        //println!("uniquify stuff---------");
-        //print!("uni1 funs contains: [");
+        println!("uniquify stuff---------");
+        print!("uni1 funs contains: [");
         for x in funs.clone() {
-            //print!("({} -> {}), ", x.0, x.1);
+            print!("({} -> {}), ", x.0, x.1);
         }
-        //println!("]");
+        println!("]");
         //println!("looking for fun_name: {} in fun", fun_name);
-        //println!("End uniquify stuff---------");
+        println!("End uniquify stuff---------");
     }
 
     let (a, funs) = uni_helper2(e, HashMap::new(), funs, (0,0));
@@ -2258,6 +2258,7 @@ fn lift_part_3<ann: Clone + std::marker::Copy + std::fmt::Display>
                 outer_let_bindings.push((format!("{}",curr_fun.to_string()), Exp::MakeClosure{
                     arity: func_env.get(curr_fun).unwrap().0,
                     label: curr_fun.to_string(),
+                    //env: Box::new(Exp::Var(format!("Arr_{}", curr_fun.to_string()), ())),
                     env: Box::new(Exp::Var(array_name.to_string(), ())),
                     ann: (),
                 }));
@@ -3642,17 +3643,19 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
             // check rax is a array
             instructions.append(&mut is_array(Reg::Rax));
             
-            // untag Rax
-            instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(1))));
-
+           
             // check that index is number
             instructions.append(&mut index_number_err(Reg::Rbx));
 
             // check that index is in bounds
             instructions.append(&mut index_bounds_err(Reg::Rbx, Reg::Rax));
 
+            // untag Rax
+            instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(1))));
+
+
             // untag index (divide Rbx by 2)
-            instructions.push(Instr::Shr(BinArgs::ToReg(Reg::Rbx, Arg32::Unsigned(1))));
+            instructions.push(Instr::Sar(BinArgs::ToReg(Reg::Rbx, Arg32::Unsigned(1))));
             
             
             // write the r14 to array[index]
@@ -3760,26 +3763,32 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
 
             
             instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(3))));
+            instructions.push(Instr::Mov(MovArgs::ToReg(Reg::R13, Arg64::Reg(Reg::Rax))));
             // check that arity matches                 rdi: 6 "wrong number of arguments"
             instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rsi, Arg64::Mem(MemRef { reg: Reg::Rax, offset: Offset::Constant(0) }))));
             instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rsi, Arg32::Unsigned(args.len() as u32))));
             instructions.push(Instr::Jne(JmpArg::Label("error_call_wrong_arity".to_string()))); 
 
             
+            
             // if it is a tail call:
             if (is_tail){
                 // Store each parameter into rsp-8, rsp-16, ...
                 // We don't/shouldn't have to worry about overwritting varibles that will be needed later due to uniquify and sequentialize
-                let mut i = 0;
-                if (true) {
-                    // put env array as first argument
-                    
-                    instructions.append(&mut compile_to_instrs_helper(
-                        &SeqExp::Imm(ImmExp::Var("Arr_Fun_0".to_string()), 0), env.clone(), false));
-                    i += 1;
-                    let address_to_write = MemRef{reg: Reg::Rsp, offset: Offset::Constant(-8 * i)};
-                    instructions.push(Instr::Mov(MovArgs::ToMem(address_to_write, Reg32::Reg(Reg::Rax))));
-                }
+                
+                //store array into rsp + -8*i
+                //add 1 to i
+                let mut i = 1;
+                instructions.append(&mut compile_to_instrs_helper(&SeqExp::Imm(fun_closure.clone(), 0), env.clone(), false));
+                //untag closure
+                instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(3))));
+             //   instructions.push(Instr::Mov(MovArgs::ToReg(Reg::R13, Arg64::Reg(Reg::Rax))));
+                //put 3rd element from closure (env array) into rax
+                instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Mem(MemRef { reg: Reg::Rax, offset: Offset::Constant(16) }))));
+                //put rax onto stack
+                let address_to_write = MemRef{reg: Reg::Rsp, offset: Offset::Constant(-8 * i)};
+                instructions.push(Instr::Mov(MovArgs::ToMem(address_to_write, Reg32::Reg(Reg::Rax))));
+
                 for a in args{
                     // Temporarly store in a register (rax) because you can't move directly from one part of memory to another
                     instructions.append(&mut compile_to_instrs_helper(&SeqExp::Imm(a.clone(), 0), env.clone(), false));
@@ -3792,9 +3801,10 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                 /*instructions.append(&mut compile_to_instrs_helper(
                     &SeqExp::Imm(fun_closure.clone(), 0), env.clone(), is_tail)
                 );*/
-                instructions.append(&mut compile_to_instrs_helper(&SeqExp::Imm(fun_closure.clone(), 0), env.clone(), is_tail));
-                instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Mem(MemRef { reg: Reg::Rax, offset: Offset::Constant(8) }))));
-                if (true) {
+       //         instructions.append(&mut compile_to_instrs_helper(&SeqExp::Imm(fun_closure.clone(), 0), env.clone(), is_tail));
+       //         instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(3))));
+                instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Mem(MemRef { reg: Reg::R13, offset: Offset::Constant(8) }))));
+                /*if (true) {
                     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rdi, Arg64::Reg(Reg::Rax))));
                     let mut max_space_needed = env.clone().len() as u32;
                     if max_space_needed % 2 == 0{ max_space_needed +=1; }
@@ -3803,21 +3813,20 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                     instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
                     instructions.push(Instr::Call(JmpArg::Label("print_snake_val".to_string())));
                     instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
-                }
+                }*/
                 if (false) {
                     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Label("Fun_0".to_string()))));
                     //instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Label(s.clone()))));
                 }
-                //instructions.push(Instr::Jmp(JmpArg::Reg(Reg::Rax)));
+                instructions.push(Instr::Jmp(JmpArg::Reg(Reg::Rax)));
                 instructions.push(Instr::Jmp(JmpArg::Label("End".to_string())));
         //        instructions.push(Instr::Jmp(JmpArg::Reg(Reg::Rax)));
          //       instructions.push(Instr::Jmp(JmpArg::Label("Fun_0".to_string())));
             }
 
             else { //non-tail
-
                 //temp to see where in assembly we start call
-                instructions.push(Instr::Add(BinArgs::ToReg(Reg::R10, Arg32::Unsigned(888888888))));
+                instructions.push(Instr::Add(BinArgs::ToReg(Reg::R10, Arg32::Unsigned(0xABCDABCD))));
 
                 // find space_needed ( amount rsp will be incremented)
                 let mut space_needed:u32 = env.len() as u32;
@@ -3832,7 +3841,17 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
 
 
                 // store args into rsp-(1+space_needed), rsp-(2+spance_needed), ...
-                let mut i:i32 = 0;
+                let mut i = 0;
+                instructions.append(&mut compile_to_instrs_helper(&SeqExp::Imm(fun_closure.clone(), 0), env.clone(), false));
+                //untag closure
+                instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(3))));
+                //put 3rd element from closure (env array) into rax
+                instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Mem(MemRef { reg: Reg::Rax, offset: Offset::Constant(16) }))));
+                //put rax onto stack
+                let address_to_write = MemRef{reg: Reg::Rsp, offset: Offset::Constant((-1* space_needed as i32) + -8 * (i + 2))};
+                instructions.push(Instr::Mov(MovArgs::ToMem(address_to_write, Reg32::Reg(Reg::Rax))));
+                i += 1;
+
                 for a in args{ 
                     let address_to_write = MemRef{reg: Reg::Rsp, offset: Offset::Constant((-1* space_needed as i32) + -8 * (i + 2))};
                     i += 1;
@@ -3849,8 +3868,7 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                     &SeqExp::Imm(fun_closure.clone(), 0), env.clone(), is_tail)
                 );
                 instructions.push(Instr::Call(JmpArg::Reg(Reg::Rax)));*/
-                instructions.append(&mut compile_to_instrs_helper(&SeqExp::Imm(fun_closure.clone(), 0), env.clone(), is_tail));
-                instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Mem(MemRef { reg: Reg::Rax, offset: Offset::Constant(8) }))));
+                instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Mem(MemRef { reg: Reg::R13, offset: Offset::Constant(8) }))));
                 instructions.push(Instr::Call(JmpArg::Reg(Reg::Rax)));
 
                 // decrement rsp by space_needed
@@ -4032,13 +4050,14 @@ where
     check_prog(p)?;
     // then give all the variables unique names
     
-    //println!("\nBefore uniquify:\n{}", print_helper(&tag_exp(p)));
+    println!("\nBefore uniquify:\n{}", print_helper(&tag_exp(p)));
     let uniq_p = tag_exp(&uniquify(&tag_exp(p)));
-    //println!("\nAfter uniquify:\n{}", print_helper(&uniq_p));
+    println!("\nAfter uniquify:\n{}", print_helper(&uniq_p));
     // lift definitions to the top level
     let (defs, main) = lambda_lift(&uniq_p);
-    println!("\nAfter Lambda Lift:\n{}", print_helper(&tag_exp(&main)));
     let (t_defs, t_main) = tag_prog(&defs, &main);
+    println!("\nAfter Lambda Lift:\n{}", print_helper(&t_main));
+    println!("Defintions:{}", print_helper_decls(&t_defs));
     // then sequentialize
     let seq_p = tag_sprog(&sequentialize_program(&t_defs, &t_main));
     // then codegen
