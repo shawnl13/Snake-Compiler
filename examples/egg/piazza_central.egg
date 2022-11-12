@@ -1,4 +1,6 @@
 let x = 1,
     y = 2,
-    f = (lambda n: 2 * n * x * y end) in
+    f = (lambda n: n + x end) in
 f(5)
+
+

@@ -24,9 +24,10 @@ macro_rules! mk_fail_test {
  */
 
 // egg eater tests
-//mk_test!(egg_piazza_central, "egg/piazza_central.egg", "20");
+mk_test!(egg_piazza_central, "egg/piazza_central.egg", "6");
+mk_test!(dia_simple_function, "egg/simple_fun.egg", "5");
 //mk_test!(diamondback_non_tail_fun, "dia/non_tail_fun.dia", "6");
-//*
+/*
 
 mk_test!(egg_print_array_simple, "egg/print_array.egg", "[4, false, [true, 3]]");
 mk_test!(looped_array, "egg/looped_array.egg", "[0, <loop>]");
@@ -39,7 +40,7 @@ mk_test!(egg_chain_array_set, "egg/chain_array_set.egg", "5");
 mk_test!(egg_chain_array_set_complicated, "egg/chain_array_set copy.egg", "0");
 mk_test!(egg_create_array, "egg/create_array.egg", "1");
 mk_test!(egg_len_simple, "egg/len_simple.egg", "2");
-mk_test!(egg_weird_call, "egg/weird_call.egg", "2");
+//mk_test!(egg_weird_call, "egg/weird_call.egg", "2");
 
 
 mk_test!(egg_recursive_arrays_interesting, "interesting.egg", "8");
@@ -99,7 +100,7 @@ mk_test!(boa_test_sub_simple, "boa/test_sub_simple.boa","-6");
 mk_test!(boa_test_prim2_let, "boa/test_prim2_let.boa","19");
 mk_test!(boa_test_let_nested, "boa/test_let_nested.boa","2");
 mk_test!(boa_test_debug_let, "boa/test_debug_let.boa","3");
-//*/
+*/
 
 // IMPLEMENTATION
 fn test_example_file(f: &str, expected_str: &str) -> std::io::Result<()> {
