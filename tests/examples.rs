@@ -24,24 +24,29 @@ macro_rules! mk_fail_test {
  */
 
 // egg eater tests
+//mk_test!(egg_piazza_central, "egg/piazza_central.egg", "20");
+//mk_test!(diamondback_non_tail_fun, "dia/non_tail_fun.dia", "6");
+//*
+
 mk_test!(egg_print_array_simple, "egg/print_array.egg", "[4, false, [true, 3]]");
 mk_test!(looped_array, "egg/looped_array.egg", "[0, <loop>]");
 
 
 //mk_test!(egg_interesting, "interesting,egg", 42);
-//mk_test!(egg_other, "egg/other.egg", 2);
-//mk_test!(egg_apply_to_five, "egg/applyToFive.egg", "6");
+mk_test!(egg_apply_to_five, "egg/applyToFive.egg", "6");
 mk_test!(egg_array_simple, "egg/array_simple.egg", "5");
 mk_test!(egg_chain_array_set, "egg/chain_array_set.egg", "5");
 mk_test!(egg_chain_array_set_complicated, "egg/chain_array_set copy.egg", "0");
 mk_test!(egg_create_array, "egg/create_array.egg", "1");
 mk_test!(egg_len_simple, "egg/len_simple.egg", "2");
+mk_test!(egg_weird_call, "egg/weird_call.egg", "2");
+
 
 mk_test!(egg_recursive_arrays_interesting, "interesting.egg", "8");
 
 
 //
-//mk_fail_test!(egg_call_non_fun_err, "egg/call_bool_err.egg", "called a non-function");
+mk_fail_test!(egg_call_non_fun_err, "egg/call_bool_err.egg", "called a non-function");
 //mk_fail_test!(egg_arity_err, "egg/arity_err.egg", "wrong number of arguments");
 
 mk_fail_test!(egg_index_non_array_err, "egg/index_non_array_err.egg", "indexed into non-array");
@@ -89,14 +94,12 @@ mk_test!(boa_test_multiple_bindings, "boa/test_multiple_bindings.boa", "20");
 
 // These should print "if expected a boolean" to console
 mk_fail_test!(boa_test_if_simple, "boa/test_if_simple.boa", "if expected a boolean");
-//mk_test!(test_mult_if, "test_mult_if.boa", "55");
-//mk_test!(test_if_nested, "test_if_nested.boa","23");
 mk_test!(boa_test_add_simple, "boa/test_add_simple.boa","9");
 mk_test!(boa_test_sub_simple, "boa/test_sub_simple.boa","-6");
 mk_test!(boa_test_prim2_let, "boa/test_prim2_let.boa","19");
 mk_test!(boa_test_let_nested, "boa/test_let_nested.boa","2");
 mk_test!(boa_test_debug_let, "boa/test_debug_let.boa","3");
-
+//*/
 
 // IMPLEMENTATION
 fn test_example_file(f: &str, expected_str: &str) -> std::io::Result<()> {

@@ -635,7 +635,7 @@ where
         }
         SurfProg::Call(fun, args, ann) => {
 
-            match *fun.clone(){
+            /*match *fun.clone(){
                 SurfProg::Var(s, _) => {
                     if (!vars.contains(&s) && !funs.contains(&s)) {
                         return (Err(CompileErr::UnboundVariable {
@@ -646,7 +646,11 @@ where
                 }
                 SurfProg::Lambda { parameters, body, ann } => { panic!("NYI:Check_prog_2 call lambda")}
                 _ => { panic!("Check_prog_2 call did not contain a var."); }
-            }
+            }*/
+
+            let (temp, funs_temp)  = check_prog_helper2(fun, vars.clone(), funs);
+            funs = funs_temp;
+            if temp.is_err() { return (temp, funs); }
 
             for cur_arg in args {
                 let (temp, funs_temp) = check_prog_helper2(cur_arg, vars.clone(), funs);
@@ -764,7 +768,15 @@ fn uni_helper(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
         Exp::Num(value, _) => {return (Exp::Num(*value,()), new_funs);},
         Exp::Bool(x, _) => {return (Exp::Bool(*x, ()), new_funs);},
         Exp::Var(s, _) => {
-            return (Exp::Var(new_vars.get(s).unwrap().to_string(), ()), new_funs);
+            let x;
+            if new_vars.get(s).is_some() {
+                x = new_vars.get(s).unwrap().to_string();
+            }
+            else {
+                x = new_funs.get(s).unwrap().to_string();
+            }
+            
+            return (Exp::Var(x, ()), new_funs);
         },
         Exp::Prim1(p, e, _) => {
             let mut exp;
@@ -834,12 +846,23 @@ fn uni_helper(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
                 ann: ()}, new_funs);
 
         },
-        Exp::Call(s, a, _) => {
+        Exp::Call(s, a, ann) => {
             let fun_name;
             match *s.clone(){
-                Exp::Var(x, _) => {fun_name = Exp::Var(x.to_string(), ());}
+                Exp::Var(x, _) => {
+                    /*
+                    if new_vars.contains_key(&x.to_string()) {
+                        fun_name = Exp::Var(new_vars.get(&x.to_string()).unwrap().to_string(), ());
+                    } else if new_funs.contains_key(&x.to_string()){
+                        fun_name = Exp::Var(new_funs.get(&x.to_string()).unwrap().to_string(), ());
+                    } else {
+                        panic!("neither new_vars nor new_funs contains {}", x);
+                    }*/
+                    fun_name = Exp::Var(x.to_string(), ());
+                }
                 _ => {panic!("uni_helper calling something not var");}
             }
+
 
             let mut new_parameters:Vec<Exp<()>> = Vec::new();
             for cur_p in a{
@@ -901,6 +924,168 @@ fn uni_helper(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
 
 }
 
+fn uni_helper2(e: &Exp<u32>, mut new_vars: HashMap<String,String>, 
+    mut new_funs: HashMap<String,String>, mut count: (usize, usize) )
+ -> (Exp<()>, HashMap<String,String>){
+    match e {
+        Exp::Num(value, _) => {return (Exp::Num(*value,()), new_funs);},
+        Exp::Bool(x, _) => {return (Exp::Bool(*x, ()), new_funs);},
+        Exp::Var(s, _) => {
+            let x;
+            if new_funs.get(s).is_some() {
+                x = new_funs.get(s).unwrap().to_string();
+                println!("uni2 var {} -> {}", s, x);
+            }
+            else {
+                x = new_vars.get(s).unwrap().to_string();
+                println!("uni2 var {} -> {}", s, x);
+            }
+            
+            return (Exp::Var(x, ()), new_funs);
+        },
+        Exp::Prim1(p, e, _) => {
+            let mut exp;
+            (exp, new_funs) = uni_helper2(e, new_vars.clone(), new_funs, count);
+            return (Exp::Prim1(*p, Box::new(exp), ()), new_funs);
+        },
+        Exp::Prim2(p, e1, e2, _) => {
+            let mut exp1; let mut exp2;
+            (exp1, new_funs) = uni_helper2(e1, new_vars.clone(), new_funs, count);
+            (exp2, new_funs) = uni_helper2(e2, new_vars.clone(), new_funs, count);
+            return (Exp::Prim2(*p, Box::new(exp1), Box::new(exp2), ()), new_funs);
+        },
+        Exp::Let { bindings, body, ann } => {
+            let mut new_bindings:Vec<(String, Exp<()>)> = Vec::new();
+            let old_vars = new_vars.clone();
+            for binding in bindings {
+                let mut temp;
+                (temp, new_funs) = uni_helper2(&binding.1, new_vars.clone(),new_funs, count);
+                let new_name = format!("Var_{}", count.0);
+                count.0 +=1;
+                new_vars.insert(binding.0.to_string(), new_name.to_string());
+                new_bindings.push((new_name.to_string(), temp));
+            }
+            let mut new_body;
+            (new_body, new_funs) = uni_helper2(body, new_vars.clone(), new_funs, count);
+            return (Exp::Let { bindings: new_bindings, body: Box::new(new_body), ann: () }, new_funs);
+        },
+        Exp::If { cond, thn, els, ann } => {
+            let mut c; let mut t; let mut e;
+            (c, new_funs) = uni_helper2(cond, new_vars.clone(), new_funs, count);
+            (t, new_funs) = uni_helper2(thn, new_vars.clone(), new_funs, count);
+            (e, new_funs) = uni_helper2(els, new_vars.clone(), new_funs, count);
+            return (Exp::If{cond: Box::new(c), 
+                            thn: Box::new(t), 
+                            els: Box::new(e),
+                            ann: (),}, new_funs);
+        }
+        Exp::FunDefs { decls, body, ann } => {
+            let mut new_decls:Vec<FunDecl<Exp<()>, ()>> = Vec::new();
+            let old_vars = new_vars.clone();
+            for curr_decl in decls{
+                // for each function declaration, give the funcion a new name
+                let new_func_name = format!("Fun_{}", count.1);
+                count.1 += 1;
+                new_funs.insert(curr_decl.name.to_string(), new_func_name.to_string());
+
+                // treat each argument like a let statement with no bindings, renaming the argument and adding to new_vars
+                // save the new parameters for later Exp::FunDefs
+                let mut new_parameters:Vec<String> = Vec::new();
+                for curr_parameter in curr_decl.parameters.clone() {
+                    let new_parameter_name = format!("Fun_{}_param_{}_previous_param_{}", curr_decl.name.to_string(),count.0, curr_parameter);
+                    count.0 +=1;
+                    new_vars.insert(curr_parameter, new_parameter_name.to_string());
+                    new_parameters.push(new_parameter_name);
+                }
+                // rename all the varibles inside the body of current declaration
+                let temp_exp;
+                (temp_exp, new_funs) = uni_helper2(&curr_decl.body, new_vars.clone(), new_funs, count);
+                new_decls.push(FunDecl { name: new_func_name, parameters: new_parameters, body: temp_exp, ann: () });
+            }
+
+            let temp_exp;
+            (temp_exp, new_funs) = uni_helper2(body, old_vars.clone(), new_funs, count);
+            return (Exp::FunDefs{decls: new_decls,
+                body: Box::new(temp_exp),
+                ann: ()}, new_funs);
+
+        },
+        Exp::Call(fun, a, _) => {
+            let fun_name;
+            match *fun.clone(){
+                Exp::Var(x, _) => {
+                    if new_funs.contains_key(&x.to_string()) {
+                        println!("uni2 call {} -> {}", x, new_funs.get(&x.to_string()).unwrap().to_string());
+                        fun_name = Exp::Var(new_funs.get(&x.to_string()).unwrap().to_string(), ());
+                    } else if new_vars.contains_key(&x.to_string()){
+                        println!("uni2 call new_vars {} -> {}", x, new_vars.get(&x.to_string()).unwrap().to_string());
+                        fun_name = Exp::Var(new_vars.get(&x.to_string()).unwrap().to_string(), ());
+                    } else {
+                        panic!("uni_helper2 neither new_vars nor new_funs contains {}", x);
+                    }
+                }
+                _ => {panic!("uni_helper2 calling something not var");}
+            }
+            let mut new_parameters:Vec<Exp<()>> = Vec::new();
+            for cur_p in a{
+                let renamed_para;
+                (renamed_para, new_funs) = uni_helper2(cur_p, new_vars.clone(), new_funs, count);
+                new_parameters.push(renamed_para);
+            }
+            return (Exp::Call(Box::new(fun_name), new_parameters, ()), new_funs);
+        }
+        Exp::Array(vec, ann) => {
+            let mut new_vec: Vec<Exp<()>> = Vec::new();
+            //let mut new_vars: HashSet<&String> = HashSet::new();
+
+            for curr_exp in vec{
+                let mut x;
+                x = uni_helper2(curr_exp, new_vars.clone(), new_funs, count);
+                new_funs = x.1;
+                new_vec.push(x.0);
+
+            }
+            return ((Exp::Array(new_vec, ())), new_funs);
+        }
+        Exp::ArraySet{array, index, new_value, ann} => {
+            //panic!("nyi:uni_helper arrayset");
+            let (new_array, new_index, new_value2);
+            (new_array, new_funs) = uni_helper2(array, new_vars.clone(), new_funs, count);
+            (new_index, new_funs) = uni_helper2(index, new_vars.clone(), new_funs, count);
+            (new_value2, new_funs) = uni_helper2(new_value, new_vars.clone(), new_funs, count);
+            return (Exp::ArraySet{ 
+                array: Box::new(new_array), 
+                index: Box::new(new_index), 
+                new_value: Box::new(new_value2), 
+                ann: ()}, new_funs);
+        }
+        Exp::Semicolon{e1, e2, ann} => {
+            let (new_e1, new_e2);
+            (new_e1, new_funs) = uni_helper2(e1, new_vars.clone(), new_funs, count);
+            (new_e2, new_funs) = uni_helper2(e2, new_vars.clone(), new_funs, count);
+            return (Exp::Semicolon { e1: Box::new(new_e1), e2: Box::new(new_e2), ann: (),},new_funs)
+        }
+        Exp::Lambda{parameters, body, ann} => {
+            let mut new_parameters:Vec<String> = Vec::new();
+                for curr_parameter in parameters.clone() {
+                    let new_parameter_name = format!("Lambda_{}_param_{}", ann, count.0);
+                    count.0 +=1;
+                    new_vars.insert(curr_parameter, new_parameter_name.to_string());
+                    new_parameters.push(new_parameter_name);
+                }
+            // rename all the varibles inside the body
+            let new_body;
+            (new_body, new_funs) = uni_helper2(&body, new_vars.clone(), new_funs, count);
+
+            return (Exp::Lambda{parameters: new_parameters, body: Box::new(new_body), ann: ()}, new_funs);
+        }
+        Exp::MakeClosure{arity, label, env, ann} => {
+            panic!("MakeClosure in unqi_helper");
+        }
+    }
+
+}
+
 fn uni_fix_calls(e: &Exp<()>, new_funs: HashMap<String,String>) -> Exp<()>{
     match e {
         Exp::Num(_, _) => return e.clone(),
@@ -916,6 +1101,11 @@ fn uni_fix_calls(e: &Exp<()>, new_funs: HashMap<String,String>) -> Exp<()>{
             {
                 let mut new_bindings:Vec<(String, Exp<()>)> = Vec::new();
                 for curr_binding in bindings{
+
+                    if (!new_funs.contains_key(&curr_binding.0.to_string())) {
+                        
+                    }
+
                     new_bindings.push((curr_binding.0.to_string(), uni_fix_calls(&curr_binding.1, new_funs.clone())));
                 }
                 return Exp::Let { bindings: new_bindings, 
@@ -945,6 +1135,9 @@ fn uni_fix_calls(e: &Exp<()>, new_funs: HashMap<String,String>) -> Exp<()>{
             let fun_name;
             match *fun.clone(){
                 Exp::Var(x, _) => {
+                    if new_funs.get(&x).is_none() {
+                        panic!("uni_fix_calls call new_funs does not contain {}", x);
+                    }
                     fun_name = Exp::Var(new_funs.get(&x).unwrap().to_string(), ());
                 }
                 _ => {panic!("uni_helper_fix_calls calling something not var");}
@@ -1013,8 +1206,21 @@ fn uniquify(e: &Exp<u32>) -> Exp<()> {
             let var5 = var4, var6 = var5 in
                 var5
     */
-    let (a, funs) = uni_helper(e, HashMap::new(), HashMap::new(), (0,0));
-    return uni_fix_calls(&a, funs);
+    let (a, funs) = uni_helper(&e.clone(), HashMap::new(), HashMap::new(), (0,0));
+    if true {
+        //println!("uniquify stuff---------");
+        print!("uni1 funs contains: [");
+        for x in funs.clone() {
+            print!("({} -> {}), ", x.0, x.1);
+        }
+        println!("]");
+        //println!("looking for fun_name: {} in fun", fun_name);
+        //println!("End uniquify stuff---------");
+    }
+
+    let (a, funs) = uni_helper2(e, HashMap::new(), funs, (0,0));
+    return a;
+    //return uni_fix_calls(&a, funs);
 }
 
 // Old Tests
@@ -1294,7 +1500,18 @@ fn lift_top_level<ann>(p: Exp<ann>, mut funs: Vec<FunDecl<Exp<()>, ()>>) -> (Vec
                     // 4
         },
 
-        Exp::Call(fun, args, _) => { panic!("lift_top_level contains call"); },
+        Exp::Call(fun, args, _) => {
+            let mut new_params = Vec::new();
+            for a in args{
+                let tmp;
+                (funs, tmp) = lift_top_level(a, funs);
+                new_params.push(tmp);
+            }
+            let new_fun;
+            (funs, new_fun) = lift_top_level(*fun, funs);
+            return (funs, Exp::Call(Box::new(new_fun), new_params, ()));
+            //panic!("lift_top_level contains call");
+        },
         Exp::Array(vec, _) => {
             let mut new_vec = Vec::new();
             for v in vec {
@@ -1464,6 +1681,12 @@ fn lift_replace_def_params<ann: std::marker::Copy>(e: Exp<ann>, func_param: Hash
                 let mut bindings = Vec::new();
                 let env = &func_param.get(&d.name.to_string()).unwrap().1; // env = [x1,x2,x3,f,g]
 
+                print!("lift_def_params env = [");
+                for x in env {
+                    print!("{}, ", x);
+                }
+                println!("]");
+
                 let array_name = "env".to_string();
                                 
                 let mut i = 0 as i64;
@@ -1607,7 +1830,22 @@ fn lift_replace_func_call<ann: Clone + std::marker::Copy + std::fmt::Display>
             }
             let mut let_bindings:Vec<(String, Exp<ann>)> = Vec::new();
             
-            let env = &func_param.get(&fun_name).unwrap().1; // env = [x1,x2,x3,f,g]
+            if true {
+                print!("func_params contains: [");
+                for x in func_param.clone() {
+                    print!("{}, ", x.0);
+                }
+                println!("]");
+                println!("looking for fun_name: {} in func_param", fun_name);
+            }
+
+            let mut env = &func_param.get(&fun_name).unwrap().1;
+            if func_param.contains_key(&fun_name) {
+                env = &func_param.get(&fun_name).unwrap().1;
+            } else {
+                //return Exp::Call(fun, ());
+            }
+             // env = [x1,x2,x3,f,g]
             // func_param = [ (f, [x1,x2,x3,f,g]), (g, [x1,x2,x3,f,g])]
             // want env (env.len() - func_param.len() , env.len() -1)
             // want env[]
@@ -1622,7 +1860,7 @@ fn lift_replace_func_call<ann: Clone + std::marker::Copy + std::fmt::Display>
                 array_stuff.push(Exp::Var(x.to_string(), ann.clone()));
             }
 
-            let array_name = format!("Array_{}", ann); // IDK if this should be unique, and idk how to make it unique
+            let array_name = format!("Array_{}", ann); 
             
             // create array in let statement
             let array = Exp::Array(array_stuff, ann.clone());
@@ -1634,7 +1872,7 @@ fn lift_replace_func_call<ann: Clone + std::marker::Copy + std::fmt::Display>
                 let_bindings.push((f.clone(), Exp::MakeClosure { 
                     arity: arity,
                     label: f.clone(), 
-                    env: Box::new(array.clone()), 
+                    env: Box::new(Exp::Var(array_name.to_string(), ann.clone())), 
                     ann: ann.clone() }));
             }
 
@@ -1705,6 +1943,104 @@ fn lift_replace_func_call<ann: Clone + std::marker::Copy + std::fmt::Display>
     }
 }
 
+/* Lift part 3: 
+        1. Replaces funDefs with Closures with a let inside to move the arraystuff back onto the stack
+        2. lifts funDefs to vector that gets returned
+        3. adds 1 parameter to function calls
+*/
+fn lift_part_3<ann: Clone + std::marker::Copy + std::fmt::Display>
+(mut funs: Vec<FunDecl<Exp<()>, ()>>, p: Exp<ann>, mut func_env: HashMap<String, (usize, Vec<String>)>)
+       -> (Vec<FunDecl<Exp<()>, ()>>, Exp<()>) {
+    let mut funs = Vec::new();
+    match p {
+        Exp::Num(x,_)=> return (funs, Exp::Num(x, ())),
+        Exp::Bool(x, _) => return (funs, Exp::Bool(x, ())),
+        Exp::Var(x, _) => return (funs, Exp::Var(x, ())),
+        Exp::Prim1(p, e, _) => {
+            let recursed_e;
+            (funs, recursed_e) = lift_part_3(funs, *e, func_env);
+            return (funs, Exp::Prim1(p,Box::new(recursed_e),()));
+        },
+        Exp::Prim2(p, e1, e2, _) => {
+            let (re1,re2);
+            (funs, re1) = lift_part_3(funs,*e1, func_env.clone() );
+            (funs, re2) = lift_part_3(funs, *e2, func_env.clone() );
+            return (funs, Exp::Prim2(p,Box::new(re1),Box::new(re2),()));
+        },
+        Exp::Let { bindings, body, ann } => {
+            let mut recursed_bindings:Vec<(String, Exp<()>)> = Vec::new();
+            let recursed_body;
+            for b in bindings{
+                let tmp;
+                (funs, tmp) = lift_part_3(funs, b.1, func_env.clone());
+                recursed_bindings.push((b.0,tmp));
+            }
+            (funs, recursed_body) = lift_part_3(funs, *body, func_env);
+            return (funs, Exp::Let { bindings: recursed_bindings, body: Box::new(recursed_body), ann: () });
+        },
+        Exp::If { cond, thn, els, ann } => {
+            let (c,t,e);
+            (funs,c) = lift_part_3(funs, *cond, func_env.clone());
+            (funs,t) = lift_part_3(funs, *thn, func_env.clone());
+            (funs,e) = lift_part_3(funs, *els, func_env.clone());
+            return (funs, Exp::If { cond: Box::new(c), thn: Box::new(t), els: Box::new(e), ann: () });
+        },
+        Exp::FunDefs { decls, body, ann } => {
+            // modify the body to have let statements (putting env back onto the stack from array)
+            // e.g. let var_0 = env[0], var_1 = env[1], ...
+
+            // copy the decls into funs vector, 
+
+            // replace the decls with closures
+
+
+            panic!("put stuff here");
+            for curr_decl in decls{
+                let recursed_body;
+                (funs, recursed_body) = lift_part_3(funs, curr_decl.body, func_env);
+                funs.push(FunDecl { name: curr_decl.name, parameters: curr_decl.parameters, body: recursed_body, ann: () });
+            }
+            let (funs, tmp) = lift_part_3(funs, *body, func_env);
+            return (funs, tmp);
+        },
+        Exp::Call(fun, args, _) => {
+            // Add 1 more parameter at the front (array of env)
+            panic!("NYI lift3 call");
+        },
+        Exp::Array(vec, _) => {
+            let mut new_vec = Vec::new();
+            for v in vec {
+                let x;
+                (funs, x) = lift_part_3(funs, v, func_env.clone());
+                new_vec.push(x);
+            }
+            return (funs, Exp::Array(new_vec, ()));
+        }
+        Exp::ArraySet{array, index, new_value, ann} => {
+            let (funs, recursed_array) = lift_part_3(funs, *array, func_env.clone());
+            let (funs, recursed_index) = lift_part_3(funs, *index, func_env.clone());
+            let (funs, recursed_new_value) = lift_part_3(funs, *new_value, func_env.clone());
+            return (funs, Exp::ArraySet { 
+                array: Box::new(recursed_array), 
+                index: Box::new(recursed_index), 
+                new_value: Box::new(recursed_new_value), 
+                ann: () })
+        }
+        Exp::Semicolon{e1, e2, ann} => {
+            let (funs, recursed_e1) = lift_part_3(funs, *e1, func_env.clone());
+            let (funs, recursed_e2) = lift_part_3(funs, *e2, func_env.clone());
+            return (funs, Exp::Semicolon { e1: Box::new(recursed_e1), e2: Box::new(recursed_e2), ann: () })
+        }
+        Exp::Lambda{parameters, body, ann} => {
+            panic!("Lift part 3 found a lambda");
+        }
+        Exp::MakeClosure{arity, label, env, ann} => {
+            panic!("Lift part 3 found a closure");
+        }
+    }
+}
+
+
 // Precondition: all names are uniquified
 fn lambda_lift<Ann: Clone + std::marker::Copy + std::fmt::Display>(p: &Exp<Ann>) -> (Vec<FunDecl<Exp<()>, ()>>, Exp<()>) {
 
@@ -1714,16 +2050,15 @@ fn lambda_lift<Ann: Clone + std::marker::Copy + std::fmt::Display>(p: &Exp<Ann>)
     // move all the defs to the top level
 
     //1 make hashmap linking each function with all variables in further out scope
-    let mut fun_env = lift_create_hashmap(p.clone(), Vec::new(), HashMap::new());
+   // let mut fun_env = lift_create_hashmap(p.clone(), Vec::new(), HashMap::new());
 
     // 1.1 turn lambdas into functions
     // e.g. let x = (lambda x: x + 1 end) in 42 
     //   -> let x = def lambda_0(x): x+1 in lambda_0 in 42
     // also create a list of function names
-    let mut e;
-    e = lift_convert_lambdas(p.clone());
+    let no_lambdas = lift_convert_lambdas(p.clone());
     // recreate function environment to include the functions converted from lambdas
-    fun_env = lift_create_hashmap(e.clone(), Vec::new(), HashMap::new());
+    let mut fun_env = lift_create_hashmap(no_lambdas.clone(), Vec::new(), HashMap::new());
 
     // append ordered list of every function to each value in fun_Env
     let mut vector_of_functions = Vec::new();
@@ -1738,8 +2073,15 @@ fn lambda_lift<Ann: Clone + std::marker::Copy + std::fmt::Display>(p: &Exp<Ann>)
     }
     let fun_env = newmap;
 
+    /* ToDo: create 1 helper that:
+        1. Replaces funDefs with Closures with a let inside to move the arraystuff back onto the stack
+        2. lifts funDefs to vector that gets returned
+        3. adds 1 parameter to function calls
+*/
+    return lift_part_3(Vec::new(), no_lambdas.clone(), fun_env.clone());
+
     // 1.2 replace def(params) {body} with def(env_array, params) {let env1=env_aray[1], env2 ... in body}
-    e = lift_replace_def_params(e.clone(), fun_env.clone());
+    let replaced_definitions = lift_replace_def_params(no_lambdas.clone(), fun_env.clone());
 
   /*  if (false) {
         println!("func_param contains:");
@@ -1760,7 +2102,7 @@ fn lambda_lift<Ann: Clone + std::marker::Copy + std::fmt::Display>(p: &Exp<Ann>)
                                     each function name = make_closure(fun.parameters.len(), fun.name, env_arr)
                         then mutate the empty array values to be the created closures
     */
-    let x = lift_replace_func_call(p.clone(), fun_env);
+    let x = lift_replace_func_call(replaced_definitions.clone(), fun_env);
 
     //3 lift definitions to the top level
     return lift_top_level(x, Vec::new());
@@ -2074,18 +2416,16 @@ fn sequentialize_helper(e: &Exp<u32>) -> SeqExp<()> {
             
         }
         
-        // 2 - 3
-
-        // let x1 = 2 in let x2 = 3 in x1 - x2
-
-        // (2-3) + (4 * 5)
-
-        // plus(sub(2,3),mul(4,5))
-
-        // let first = 2 - 3 in
-        // let second = 4 * 5 in
-        // first + second
+        
         Exp::Prim2(p, sub1, sub2, ann) => {
+            // 2 - 3
+            // let x1 = 2 in let x2 = 3 in x1 - x2
+            // (2-3) + (4 * 5)
+            // plus(sub(2,3),mul(4,5))
+
+            // let first = 2 - 3 in
+            // let second = 4 * 5 in
+            // first + second
             //create 2 new variable named count from sub1, sub2
             //return let var1=sequentialize_helper(sub1) in let var2=sequentialize_helper(sub2) in Prim2(p,var1,var2,ann)
             // (sub1) + (sub2) - >
@@ -2150,7 +2490,7 @@ fn sequentialize_helper(e: &Exp<u32>) -> SeqExp<()> {
         }
         Exp::FunDefs { decls, body, ann } => {panic!("Tried to sequentialize a function definition")},
 
-        Exp::Call(s, parameters, ann) => {
+        Exp::Call(function_name, parameters, ann) => {
           //  panic!("NYI: call sequentialize_helper");
             
             /* check if all parameters are  immediate
@@ -2180,14 +2520,27 @@ fn sequentialize_helper(e: &Exp<u32>) -> SeqExp<()> {
             //def a() 1 and def b() 2 in (if x a else b)()
             //                          let fun_name_replacement = if x a else b in fun_name_replacement()
 
-            let fun_name = format!("fun_name_replacement_{}", ann);
+            // def a(x,y): 2 and def b(i,j) 3 in (if true a else b) (1,2)
+
+         /*   let fun_name = format!("fun_name_replacement_{}", ann);
             let mut out = SeqExp::Let{
                 var: fun_name.to_string(),
-                bound_exp: Box::new(sequentialize_helper(s)),
+                bound_exp: Box::new(sequentialize_helper(function_name)),
                 body: Box::new(SeqExp::CallClosure{
                     fun: ImmExp::Var(fun_name),
                     args: new_para,
                     ann: ()}),
+                ann: (),
+            };*/
+            let tmp;
+            match *function_name.clone(){
+                Exp::Var(s, _) => tmp = s,
+                _ => panic!(),
+            }
+
+            let mut out = SeqExp::CallClosure{
+                fun: ImmExp::Var(tmp),
+                args: new_para,
                 ann: (),
             };
             
@@ -2200,15 +2553,15 @@ fn sequentialize_helper(e: &Exp<u32>) -> SeqExp<()> {
             // foo(a,b,c) => let bleh1 = a in let bleh2 = b in let bleh3 = c in foo(bleh1,bleh2,bleh3)
 
             /*
-            before the loop:
-            new_para_s = <bleh1,bleh2,bleh3>
-            parameters = <a, b, c>
-            pass 0: out = foo(bleh1,bleh2,bleh3)
+                before the loop:
+                new_para_s = <bleh1,bleh2,bleh3>
+                parameters = <a, b, c>
+                pass 0: out = foo(bleh1,bleh2,bleh3)
 
-            loop:
-            pass 1: out = let bleh3 = c in foo(bleh1,bleh2,bleh3)
-            pass 2: out = let bleh2 = b in let bleh3 = c in foo(bleh1,bleh2,bleh3)
-            pass 3: out = let bleh1 = a in let bleh2 = b in let bleh3 = c in foo(bleh1,bleh2,bleh3)
+                loop:
+                pass 1: out = let bleh3 = c in foo(bleh1,bleh2,bleh3)
+                pass 2: out = let bleh2 = b in let bleh3 = c in foo(bleh1,bleh2,bleh3)
+                pass 3: out = let bleh1 = a in let bleh2 = b in let bleh3 = c in foo(bleh1,bleh2,bleh3)
             */
 
             while i > 0{
@@ -2314,11 +2667,11 @@ fn sequentialize_helper(e: &Exp<u32>) -> SeqExp<()> {
             };
         }
         Exp::Lambda{parameters, body, ann} => {panic!("Tried to sequentialize a  Lambda");}
-        Exp::MakeClosure{arity, label, env, ann} => {
+        Exp::MakeClosure{arity, label, env: Closure_env, ann} => {
             return SeqExp::MakeClosure { 
                 arity: *arity, 
                 label: label.to_string(), 
-                env: return_immediate(env).unwrap(), 
+                env: return_immediate(Closure_env).unwrap(), 
                 ann: () };
         }
     }
@@ -2392,8 +2745,8 @@ fn space_needed<Ann>(e: &SeqExp<Ann>) -> i32 {
         
         SeqExp::Array(vec, ann) => {return 1;}
         SeqExp::ArraySet{array, index, new_value, ann} => {return 0;}
-        SeqExp::CallClosure { fun, args, ann } =>{panic!("nyi space needed callclosure");}
-        SeqExp::MakeClosure{arity, label, env, ann} => {panic!("NYI:sequentialize_helper MakeClosure");}
+        SeqExp::CallClosure { fun, args, ann } =>{return 1;}
+        SeqExp::MakeClosure{arity, label, env, ann} => {return 1;}
     }
     //panic!("NYI: space_needed")
 }
@@ -2569,15 +2922,25 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                 // get variable index, move value from memory to rax
                 ImmExp::Var(s) => {
                     
+                    if !env.contains(s) {
+                        instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Label(s.clone()))));
+                    } else {
+                        
                     
                     //get offset from rsp (string index in array *8)
                     let mut count = env.len();
-                    
+                    if count == 0 {panic!("env does not contain variable {}", s);}
                     loop {
                         if s == &env[count-1] {
                             break;
                         } else if count == 1 {
-                            panic!("env does not contain variable {}", s);
+                            let mut er = String::new();
+                            er += "[";
+                            for x in env.clone() {
+                                er += &format!("{}, ", x);
+                            }
+                            er += "]";
+                            panic!("env {} does not contain variable {}", er, s);
                         }
                         count -= 1;
                     }
@@ -2587,7 +2950,7 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                         reg: Reg::Rsp,
                         offset: Offset::Constant(calculated_offset),
                     };
-                    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Mem(address))));                    
+                    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Mem(address))));  }                  
                 }
             } 
         }
@@ -2984,63 +3347,6 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
             // set label for done 
             instructions.push(Instr::Label(done_lab.clone()));
         }
-        SeqExp::CallClosure{fun, args, ann} => {
-            panic!("NYI::call");
-            /*
-            // if it is a tail call:
-            if (is_tail){
-                // Store each parameter into rsp-8, rsp-16, ...
-                // We don't/shouldn't have to worry about overwritting varibles that will be needed later due to uniquify and sequentialize
-                let mut i = 0;
-                for a in args{
-                // Temporarly store in a register (rax) because you can't move directly from one part of memory to another
-                instructions.append(&mut compile_to_instrs_helper(&SeqExp::Imm(a.clone(), 0), env.clone(), false));
-                // Save rax to memory in the appropiate place
-                i += 1;
-                let address_to_write = MemRef{reg: Reg::Rsp, offset: -8 * i};
-                instructions.push(Instr::Mov(MovArgs::ToMem(address_to_write, Reg32::Reg(Reg::Rax))));
-                }
-                // jump to function 
-                instructions.push(Instr::Jmp(fun.to_string()));
-            }
-
-            else { //non-tail
-
-                //temp to see where in assembly we start call
-                instructions.push(Instr::Add(BinArgs::ToReg(Reg::R10, Arg32::Unsigned(888888888))));
-
-                // find space_needed ( amount rsp will be incremented)
-                let mut space_needed:u32 = env.len() as u32;
-                if space_needed % 2 == 0{
-                    space_needed +=1;
-                }
-                space_needed = space_needed * 8;
-             /*   print!("env = ");
-                for x in env.clone(){ print!("{}, ", x);}
-                println!();
-                println!("space needed = {}", space_needed);*/
-
-
-                // store args into rsp-(1+space_needed), rsp-(2+spance_needed), ...
-                let mut i:i32 = 0;
-                for a in args{ 
-                    let address_to_write = MemRef{reg: Reg::Rsp, offset: (-1* space_needed as i32) + -8 * (i + 2)};
-                    i += 1;
-                    // move a into rax
-                    instructions.append(&mut compile_to_instrs_helper(&SeqExp::Imm(a.clone(), 666666), env.clone(), is_tail));
-                    // move rax into rsp+i+space_needed
-                    instructions.push(Instr::Mov(MovArgs::ToMem(address_to_write, Reg32::Reg(Reg::Rax))));
-                }
-                // increment rsp by space_needed
-                instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(space_needed))));
-
-                // call to label fun
-                instructions.push(Instr::Call(fun.to_string()));
-
-                // decrement rsp by space_needed
-                instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(space_needed))));
-            }*/
-        }
         SeqExp::ArraySet { array, index, new_value, ann } => {
             
             // Store new_value into r14
@@ -3110,7 +3416,127 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
             // increase r15 by 8*length
             instructions.push(Instr::Add(BinArgs::ToReg(Reg::R15, Arg32::Unsigned(8*(size_of as u32 + 1)))));
         },
-        SeqExp::MakeClosure { arity, label, env, ann } => todo!(),
+        SeqExp::MakeClosure { arity, label, env: closure_env, ann } => {
+            // tag for pointer on stack is 0x3 (100)
+            // r15 is heap pointer
+
+            //put arity  at r15
+            let memadr = MemRef{ reg: Reg::R15, offset: Offset::Constant(0) };
+            instructions.push(Instr::Mov(MovArgs::ToMem(memadr, Reg32::Unsigned(*arity as u32))));
+            
+            //put function pointer at r15+1 (8)
+            //env.index_of(label) -> where pointer is on stack
+            instructions.append(&mut compile_to_instrs_helper(
+                &SeqExp::Imm(ImmExp::Var(label.to_string()), 0), env.clone(), is_tail));
+            let memadr = MemRef{ reg: Reg::R15, offset: Offset::Constant(8) };
+            instructions.push(Instr::Mov(MovArgs::ToMem(memadr, Reg32::Reg(Reg::Rax))));
+            
+            //put env at r15+2 (16)
+            instructions.append(&mut compile_to_instrs_helper(
+                &SeqExp::Imm(closure_env.clone(), 0), env.clone(), is_tail));
+            let memadr = MemRef{ reg: Reg::R15, offset: Offset::Constant(8*2) };
+            instructions.push(Instr::Mov(MovArgs::ToMem(memadr, Reg32::Reg(Reg::Rax))));
+
+            //put r15 into rax
+            instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Reg(Reg::R15))));
+
+            //tag rax with 0x3
+            instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(3))));
+
+            //increment r15 by 3 (24)
+            instructions.push(Instr::Add(BinArgs::ToReg(Reg::R15, Arg32::Unsigned(8*3))));
+        },
+        SeqExp::CallClosure{fun: fun_closure, args, ann} => {
+            let x;
+            match fun_closure.clone(){
+                ImmExp::Var(s) => x = s,
+                _ => {x = "asdfasdf".to_string();},
+            }
+            println!("compile CallClosure function: {}", x);
+            // put fun into rax
+            instructions.append(&mut compile_to_instrs_helper(
+                &SeqExp::Imm(fun_closure.clone(), 0), env.clone(), is_tail)
+            );
+
+
+            
+            // check that rax is a call closure         rdi: 5 "called a non-function"
+            instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rsi, Arg64::Reg(Reg::Rax))));
+            instructions.push(Instr::And(BinArgs::ToReg(Reg::Rsi, Arg32::Unsigned(7))));
+            instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rsi, Arg32::Unsigned(3))));
+            instructions.push(Instr::Jne(JmpArg::Label("error_call_non_function".to_string())));
+
+            // check that arity matches                 rdi: 6 "wrong number of arguments"
+            instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rsi, Arg64::Mem(MemRef { reg: Reg::Rax, offset: Offset::Constant(0) }))));
+            instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rsi, Arg32::Unsigned(args.len() as u32))));
+            instructions.push(Instr::Jne(JmpArg::Label("error_call_wrong_arity".to_string()))); 
+
+            
+            // if it is a tail call:
+            if (is_tail){
+                // Store each parameter into rsp-8, rsp-16, ...
+                // We don't/shouldn't have to worry about overwritting varibles that will be needed later due to uniquify and sequentialize
+                let mut i = 0;
+                for a in args{
+                    // Temporarly store in a register (rax) because you can't move directly from one part of memory to another
+                    instructions.append(&mut compile_to_instrs_helper(&SeqExp::Imm(a.clone(), 0), env.clone(), false));
+                    // Save rax to memory in the appropiate place
+                    i += 1;
+                    let address_to_write = MemRef{reg: Reg::Rsp, offset: Offset::Constant(-8 * i)};
+                    instructions.push(Instr::Mov(MovArgs::ToMem(address_to_write, Reg32::Reg(Reg::Rax))));
+                }
+                // jump to function 
+                /*instructions.append(&mut compile_to_instrs_helper(
+                    &SeqExp::Imm(fun_closure.clone(), 0), env.clone(), is_tail)
+                );*/
+                instructions.append(&mut compile_to_instrs_helper(&SeqExp::Imm(fun_closure.clone(), 0), env.clone(), is_tail));
+                instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Mem(MemRef { reg: Reg::Rax, offset: Offset::Constant(1*8) }))));
+                instructions.push(Instr::Jmp(JmpArg::Reg(Reg::Rax)));
+            }
+
+            else { //non-tail
+
+                //temp to see where in assembly we start call
+                instructions.push(Instr::Add(BinArgs::ToReg(Reg::R10, Arg32::Unsigned(888888888))));
+
+                // find space_needed ( amount rsp will be incremented)
+                let mut space_needed:u32 = env.len() as u32;
+                if space_needed % 2 == 0{
+                    space_needed +=1;
+                }
+                space_needed = space_needed * 8;
+             /*   print!("env = ");
+                for x in env.clone(){ print!("{}, ", x);}
+                println!();
+                println!("space needed = {}", space_needed);*/
+
+
+                // store args into rsp-(1+space_needed), rsp-(2+spance_needed), ...
+                let mut i:i32 = 0;
+                for a in args{ 
+                    let address_to_write = MemRef{reg: Reg::Rsp, offset: Offset::Constant((-1* space_needed as i32) + -8 * (i + 2))};
+                    i += 1;
+                    // move a into rax
+                    instructions.append(&mut compile_to_instrs_helper(&SeqExp::Imm(a.clone(), 666666), env.clone(), is_tail));
+                    // move rax into rsp+i+space_needed
+                    instructions.push(Instr::Mov(MovArgs::ToMem(address_to_write, Reg32::Reg(Reg::Rax))));
+                }
+                // increment rsp by space_needed
+                instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(space_needed))));
+
+                // call to label fun
+            /*    instructions.append(&mut compile_to_instrs_helper(
+                    &SeqExp::Imm(fun_closure.clone(), 0), env.clone(), is_tail)
+                );
+                instructions.push(Instr::Call(JmpArg::Reg(Reg::Rax)));*/
+                instructions.append(&mut compile_to_instrs_helper(&SeqExp::Imm(fun_closure.clone(), 0), env.clone(), is_tail));
+                instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Mem(MemRef { reg: Reg::Rax, offset: Offset::Constant(1*8) }))));
+                instructions.push(Instr::Call(JmpArg::Reg(Reg::Rax)));
+
+                // decrement rsp by space_needed
+                instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(space_needed))));
+            }
+        }
     }
     return instructions;
 }
@@ -3121,11 +3547,10 @@ fn compile_to_instr_functions(funcs:Vec<FunDecl<SeqExp<u32>, u32>>, e: &SeqExp<u
 
     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::R15, Arg64::Label("HEAP".to_string()))));
     // add 7
-    /*instructions.push(Instr::Add(BinArgs::ToReg(Reg::R15, Arg32::Unsigned(7))));
+    instructions.push(Instr::Add(BinArgs::ToReg(Reg::R15, Arg32::Unsigned(16))));
     // round down to nearest multiple of 8
-    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rbx, Arg64::Unsigned(0xFF_FF_FF_FF_FF_FF_FF_F7))));
-
-    instructions.push(Instr::And(BinArgs::ToReg(Reg::R15, Arg32::Reg(Reg::Rbx))));*/
+    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rbx, Arg64::Unsigned(0xFF_FF_FF_FF_FF_FF_FF_F0))));
+    instructions.push(Instr::And(BinArgs::ToReg(Reg::R15, Arg32::Reg(Reg::Rbx))));
 
 
     
@@ -3149,7 +3574,7 @@ fn compile_to_instr_functions(funcs:Vec<FunDecl<SeqExp<u32>, u32>>, e: &SeqExp<u
         a is located in rsp + 8 *1 in mem
          */
 
-
+        println!("Compile creating label: {}", f.name);
         // create function label
         instructions.push(Instr::Label(f.name));
         // write the function body
@@ -3227,6 +3652,21 @@ fn compile_to_instr_functions(funcs:Vec<FunDecl<SeqExp<u32>, u32>>, e: &SeqExp<u
     // should be inc
     instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
     
+    instructions.push(Instr::Label("error_call_non_function".to_string()));
+    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rdi, Arg64::Unsigned(5))));
+    instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
+    // call rust function
+    instructions.push(Instr::Call(JmpArg::Label("snake_error".to_string())));
+    // should be inc
+    instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
+
+    instructions.push(Instr::Label("error_call_wrong_arity".to_string()));
+    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rdi, Arg64::Unsigned(6))));
+    instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
+    // call rust function
+    instructions.push(Instr::Call(JmpArg::Label("snake_error".to_string())));
+    // should be inc
+    instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
 
     
 

@@ -1,0 +1,1 @@
+def a(x,y): 2 and def b(i,j): 3 in (if true : a else: b) (1,2)
