@@ -24,7 +24,7 @@ macro_rules! mk_fail_test {
  */
 
 // egg eater tests
-mk_test!(egg_piazza_central, "egg/piazza_central.egg", "6");
+//mk_test!(egg_piazza_central, "egg/piazza_central.egg", "6");
 mk_test!(dia_simple_function, "egg/simple_fun.egg", "5");
 //mk_test!(diamondback_non_tail_fun, "dia/non_tail_fun.dia", "6");
 /*

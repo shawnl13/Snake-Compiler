@@ -280,10 +280,6 @@ where
     
 }
 
-fn print_exp<'a>(e: &'a Exp<u32>) -> String {
-    //return print_helper(e, "".to_string());
-    return print_helper(e);
-}
 
 fn print_helper<'a>(e: &'a Exp<u32>) -> String {
     let mut out = "".to_string();
@@ -379,6 +375,101 @@ fn print_helper<'a>(e: &'a Exp<u32>) -> String {
     }
     return out;
 }
+/*
+fn print_helper_seq<'a>(e: &'a SeqExp<u32>) -> String {
+    let mut out = "".to_string();
+    match e{
+        SeqExp::Num(x, a) => {
+            out += &format!("Num({})",x);
+        },
+        SeqExp::Bool(x, a) => {
+            out += &format!("Bool({})",x);           
+        },
+        SeqExp::Var(x, a) => {
+            out += &format!("Var({})",x);
+        },
+        SeqExp::Prim1(p, x, a) => {
+            out += &format!("Prim1(Prim1::");
+            match p{
+                Add1 => {out += &format!("Add1({}))", print_helper(x));},
+                Sub1 => {out += &format!("Sub1({}))", print_helper(x));},
+                Not => {out += &format!("Not({}))", print_helper(x));},
+                Print => {out += &format!("Print({}))", print_helper(x));},
+                IsBool => {out += &format!("IsBool({}))", print_helper(x));},
+                IsNum => {out += &format!("IsNum({}))", print_helper(x));},
+                Length => {out += &format!("Length({}))", print_helper(x));},
+                IsArray => {out += &format!("IsArray({})", print_helper(x));},
+                IsFun => {out += &format!("IsFun({}))", print_helper(x));}, 
+            }
+        },
+        SeqExp::Prim2(p, e1, e2, a) => {
+            out += &format!("Prim2(Prim2::");
+            match p{
+                Add => {out += &format!("Add({},{}))", print_helper(e1), print_helper(e2));},
+                Sub => {out += &format!("Sub({},{})", print_helper(e1), print_helper(e2));},
+                Mul => {out += &format!("Mul({},{}))", print_helper(e1), print_helper(e2));},
+                And => {out += &format!("And({},{}))", print_helper(e1), print_helper(e2));},
+                Or => {out += &format!("Or({},{}))", print_helper(e1), print_helper(e2));},
+                Lt => {out += &format!("Lt({},{})", print_helper(e1), print_helper(e2));},
+                Gt => {out += &format!("Gt({},{}))", print_helper(e1), print_helper(e2));},
+                Le => {out += &format!("Le({},{}))", print_helper(e1), print_helper(e2));},
+                Ge => {out += &format!("Ge({},{}))", print_helper(e1), print_helper(e2));},
+                Eq => {out += &format!("Eq({},{}))", print_helper(e1), print_helper(e2));},
+                Neq => {out += &format!("Neq({},{}))", print_helper(e1), print_helper(e2));},
+                ArrayGet => {out += &format!("ArrayGet({},{}))", print_helper(e1), print_helper(e2));}
+            }
+        },
+        SeqExp::Let { bindings, body, ann } => {
+            out += "let ";
+            for b in bindings{
+                out += &format!("{} = {}, ", b.0, print_helper(&b.1));
+            }
+            out = out[..out.len()-2].to_string();
+            out += &format!(" in {}", print_helper(body));
+        },
+        SeqExp::If { cond, thn, els, ann } => {
+            out+= &format!("If{{ cond: {}, thn: {}, els: {} }}", 
+        print_helper(cond), print_helper(thn), print_helper(els));
+        }
+        SeqExp::FunDefs { decls, body, ann } => {
+            out += "FunDefs {{ vec![";
+            let mut tmp = "".to_string();
+            for x in decls{
+                out += &format!("FunDecl{{name: {}, body: {}, ann: {}}}", x.name, print_helper(&x.body), x.ann);
+            } 
+            out += &format!("], body: {}, ann: {} }}", print_helper(body), ann);
+        },
+        SeqExp::Array(vec, ann) => {
+            let mut tmp = "".to_string();
+            for x in vec{
+                tmp += &print_helper(x);
+                tmp += ", ";
+            }
+            out += &format!("Array( vec![{}], ann: {})", tmp, ann);
+        }
+        SeqExp::ArraySet{array, index, new_value, ann} => {
+            out += &format!("ArraySet{{array: {}, index: {}, new_value: {}, ann: {}}}",
+             print_helper(array), print_helper(index), print_helper(new_value), ann);
+        }
+        SeqExp::Semicolon{e1, e2, ann} => {
+            out += &format!("Semicolon{{e1: {}, e2: {}, ann: {}}}", print_helper(e1), print_helper(e2), ann);
+        }
+        SeqExp::Lambda{parameters, body, ann} => {
+            out += &format!("Lambda{{parameters: vec![{}], body: {}, ann: {}}}", parameters.join(", "), print_helper(body), ann);
+        }
+        SeqExp::MakeClosure{arity, label, env, ann} => {
+            out += &format!("MakeClosure{{arity: {}, label: {}, env: {}, ann: {}}}", arity, label, print_helper(env), ann);
+        }
+        SeqExp::CallClosure { fun, args, ann } => {
+            out+= &format!("Call({}, vec![", print_helper(fun));
+            for x in args{
+                out+=&format!("{},", print_helper(x));
+            }
+            out += "])";
+        }
+    }
+    return out;
+}*/
 
 fn check_prog_helper_prints<'a, Span>(
     p: &'a SurfProg<Span>,
@@ -2156,7 +2247,7 @@ fn lift_part_3<ann: Clone + std::marker::Copy + std::fmt::Display>
             let mut new_body;
             (funs, new_body) = lift_part_3(funs, *body, func_env.clone());
 
-            let array_name = format!("EnvArr_{}", &decls[0].name.to_string());
+            let array_name = format!("Arr_{}", &decls[0].name.to_string());
             let mut outer_let_bindings = vec![(array_name.to_string(), env_array)];
 
             let mut i = fun_def_env.len() - func_env.len();
@@ -2164,7 +2255,7 @@ fn lift_part_3<ann: Clone + std::marker::Copy + std::fmt::Display>
             let function_list = &fun_def_env[(fun_def_env.len() - func_env.len())..];
 
             for curr_fun in function_list{
-                outer_let_bindings.push((curr_fun.to_string(), Exp::MakeClosure{
+                outer_let_bindings.push((format!("{}",curr_fun.to_string()), Exp::MakeClosure{
                     arity: func_env.get(curr_fun).unwrap().0,
                     label: curr_fun.to_string(),
                     env: Box::new(Exp::Var(array_name.to_string(), ())),
@@ -2179,7 +2270,7 @@ fn lift_part_3<ann: Clone + std::marker::Copy + std::fmt::Display>
                     e1: Box::new(Exp::ArraySet { 
                         array: Box::new(Exp::Var(array_name.to_string(), ())), 
                         index: Box::new(Exp::Num(i as i64, ())), 
-                        new_value: Box::new(Exp::Var(curr_fun.to_string(), ())), 
+                        new_value: Box::new(Exp::Var(format!("{}",curr_fun.to_string()), ())), 
                         ann: () }), 
                     e2: Box::new(new_body),
                     ann: () 
@@ -2682,13 +2773,13 @@ fn sequentialize_helper(e: &Exp<u32>) -> SeqExp<()> {
           //  panic!("NYI: call sequentialize_helper");
             
             /* check if all parameters are  immediate
-             if they are all immediate, return seq::call(s, )
+                if they are all immediate, return seq::call(s, )
 
 
-            foo(1, true, x+2) -> let bleh_* = (x+2) in foo(1,true,bleh_*)
-                              -> let bleh_1 = 1 in let bleh2 = true in let bleh3 = x+2 in foo(bleh1,bleh2,bleh3)
+                foo(1, true, x+2) -> let bleh_* = (x+2) in foo(1,true,bleh_*)
+                                -> let bleh_1 = 1 in let bleh2 = true in let bleh3 = x+2 in foo(bleh1,bleh2,bleh3)
 
-            foo2(2)     -> let bleh = 2 in foo2(bleh)
+                foo2(2)     -> let bleh = 2 in foo2(bleh)
             */
             
             
@@ -2704,22 +2795,22 @@ fn sequentialize_helper(e: &Exp<u32>) -> SeqExp<()> {
                 new_para.push(ImmExp::Var(tmp.to_string()));
                 new_para_s.push(tmp.to_string());
             }
-            
-            //def a() 1 and def b() 2 in (if x a else b)()
-            //                          let fun_name_replacement = if x a else b in fun_name_replacement()
+            /*
+                //def a() 1 and def b() 2 in (if x a else b)()
+                //                          let fun_name_replacement = if x a else b in fun_name_replacement()
 
-            // def a(x,y): 2 and def b(i,j) 3 in (if true a else b) (1,2)
+                // def a(x,y): 2 and def b(i,j) 3 in (if true a else b) (1,2)
 
-         /*   let fun_name = format!("fun_name_replacement_{}", ann);
-            let mut out = SeqExp::Let{
-                var: fun_name.to_string(),
-                bound_exp: Box::new(sequentialize_helper(function_name)),
-                body: Box::new(SeqExp::CallClosure{
-                    fun: ImmExp::Var(fun_name),
-                    args: new_para,
-                    ann: ()}),
-                ann: (),
-            };*/
+                /*   let fun_name = format!("fun_name_replacement_{}", ann);
+                let mut out = SeqExp::Let{
+                    var: fun_name.to_string(),
+                    bound_exp: Box::new(sequentialize_helper(function_name)),
+                    body: Box::new(SeqExp::CallClosure{
+                        fun: ImmExp::Var(fun_name),
+                        args: new_para,
+                        ann: ()}),
+                    ann: (),
+                };*/*/
             let tmp;
             match *function_name.clone(){
                 Exp::Var(s, _) => tmp = s,
@@ -3472,7 +3563,7 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                     // write the value from array[index] to rax
                     let mem = MemRef{ 
                         reg: Reg::Rax, 
-                        offset: Offset::Computed { reg: Reg::Rbx, factor: -8, constant: -8 } // try setting const to 1 if broken
+                        offset: Offset::Computed { reg: Reg::Rbx, factor: 8, constant: 8 } // try setting const to 1 if broken
                     };
                     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Mem(mem))));
 
@@ -3567,7 +3658,7 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
             // write the r14 to array[index]
             let mem = MemRef{ 
                 reg: Reg::Rax, 
-                offset: Offset::Computed { reg: Reg::Rbx, factor: -8, constant: -8 } 
+                offset: Offset::Computed { reg: Reg::Rbx, factor: 8, constant: 8 } 
             };
             instructions.push(Instr::Mov(MovArgs::ToMem(mem, Reg32::Reg(Reg::R14))));
 
@@ -3589,7 +3680,7 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                     &SeqExp::Imm(curr_element.clone(), *ann), env.clone(), is_tail)
                 );
                 // store rax onto heap
-                let memadr = MemRef{ reg: Reg::R15, offset: Offset::Constant(-8*i) };
+                let memadr = MemRef{ reg: Reg::R15, offset: Offset::Constant(8*i) };
                 instructions.push(Instr::Mov(MovArgs::ToMem(memadr, Reg32::Reg(Reg::Rax))));
                 // add 8 to r15
                 i += 1;
@@ -3612,18 +3703,30 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
             //put arity  at r15
             let memadr = MemRef{ reg: Reg::R15, offset: Offset::Constant(0) };
             instructions.push(Instr::Mov(MovArgs::ToMem(memadr, Reg32::Unsigned(*arity as u32))));
+
+            if (false) {
+                instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rdi, Arg64::Reg(Reg::Rax))));
+                let mut max_space_needed = env.clone().len() as u32;
+                if max_space_needed % 2 == 0{ max_space_needed +=1; }
+                max_space_needed = max_space_needed * 8;
+
+                instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
+                instructions.push(Instr::Call(JmpArg::Label("print_snake_val".to_string())));
+                instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
+            }
             
             //put function pointer at r15+1 (8)
             //env.index_of(label) -> where pointer is on stack
+            println!("compile makeclosure label = {}", label);
             instructions.append(&mut compile_to_instrs_helper(
                 &SeqExp::Imm(ImmExp::Var(label.to_string()), 0), env.clone(), is_tail));
-            let memadr = MemRef{ reg: Reg::R15, offset: Offset::Constant(-8) };
+            let memadr = MemRef{ reg: Reg::R15, offset: Offset::Constant(8) };
             instructions.push(Instr::Mov(MovArgs::ToMem(memadr, Reg32::Reg(Reg::Rax))));
             
             //put env at r15+2 (16)
             instructions.append(&mut compile_to_instrs_helper(
                 &SeqExp::Imm(closure_env.clone(), 0), env.clone(), is_tail));
-            let memadr = MemRef{ reg: Reg::R15, offset: Offset::Constant(-8*2) };
+            let memadr = MemRef{ reg: Reg::R15, offset: Offset::Constant(8*2) };
             instructions.push(Instr::Mov(MovArgs::ToMem(memadr, Reg32::Reg(Reg::Rax))));
 
             //put r15 into rax
@@ -3655,6 +3758,7 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
             instructions.push(Instr::Cmp(BinArgs::ToReg(Reg::Rsi, Arg32::Unsigned(3))));
             instructions.push(Instr::Jne(JmpArg::Label("error_call_non_function".to_string())));
 
+            
             instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(3))));
             // check that arity matches                 rdi: 6 "wrong number of arguments"
             instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rsi, Arg64::Mem(MemRef { reg: Reg::Rax, offset: Offset::Constant(0) }))));
@@ -3667,6 +3771,15 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                 // Store each parameter into rsp-8, rsp-16, ...
                 // We don't/shouldn't have to worry about overwritting varibles that will be needed later due to uniquify and sequentialize
                 let mut i = 0;
+                if (true) {
+                    // put env array as first argument
+                    
+                    instructions.append(&mut compile_to_instrs_helper(
+                        &SeqExp::Imm(ImmExp::Var("Arr_Fun_0".to_string()), 0), env.clone(), false));
+                    i += 1;
+                    let address_to_write = MemRef{reg: Reg::Rsp, offset: Offset::Constant(-8 * i)};
+                    instructions.push(Instr::Mov(MovArgs::ToMem(address_to_write, Reg32::Reg(Reg::Rax))));
+                }
                 for a in args{
                     // Temporarly store in a register (rax) because you can't move directly from one part of memory to another
                     instructions.append(&mut compile_to_instrs_helper(&SeqExp::Imm(a.clone(), 0), env.clone(), false));
@@ -3680,8 +3793,25 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                     &SeqExp::Imm(fun_closure.clone(), 0), env.clone(), is_tail)
                 );*/
                 instructions.append(&mut compile_to_instrs_helper(&SeqExp::Imm(fun_closure.clone(), 0), env.clone(), is_tail));
-                instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Mem(MemRef { reg: Reg::Rax, offset: Offset::Constant(-1*8) }))));
-                instructions.push(Instr::Jmp(JmpArg::Reg(Reg::Rax)));
+                instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Mem(MemRef { reg: Reg::Rax, offset: Offset::Constant(8) }))));
+                if (true) {
+                    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rdi, Arg64::Reg(Reg::Rax))));
+                    let mut max_space_needed = env.clone().len() as u32;
+                    if max_space_needed % 2 == 0{ max_space_needed +=1; }
+                    max_space_needed = max_space_needed * 8;
+    
+                    instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
+                    instructions.push(Instr::Call(JmpArg::Label("print_snake_val".to_string())));
+                    instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
+                }
+                if (false) {
+                    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Label("Fun_0".to_string()))));
+                    //instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Label(s.clone()))));
+                }
+                //instructions.push(Instr::Jmp(JmpArg::Reg(Reg::Rax)));
+                instructions.push(Instr::Jmp(JmpArg::Label("End".to_string())));
+        //        instructions.push(Instr::Jmp(JmpArg::Reg(Reg::Rax)));
+         //       instructions.push(Instr::Jmp(JmpArg::Label("Fun_0".to_string())));
             }
 
             else { //non-tail
@@ -3720,7 +3850,7 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                 );
                 instructions.push(Instr::Call(JmpArg::Reg(Reg::Rax)));*/
                 instructions.append(&mut compile_to_instrs_helper(&SeqExp::Imm(fun_closure.clone(), 0), env.clone(), is_tail));
-                instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Mem(MemRef { reg: Reg::Rax, offset: Offset::Constant(-8) }))));
+                instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Mem(MemRef { reg: Reg::Rax, offset: Offset::Constant(8) }))));
                 instructions.push(Instr::Call(JmpArg::Reg(Reg::Rax)));
 
                 // decrement rsp by space_needed
@@ -3736,13 +3866,14 @@ fn compile_to_instr_functions(funcs:Vec<FunDecl<SeqExp<u32>, u32>>, e: &SeqExp<u
     let mut instructions = Vec::new();
 
     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::R15, Arg64::Label("HEAP".to_string()))));
+    
+    /*
     // add 7
     instructions.push(Instr::Add(BinArgs::ToReg(Reg::R15, Arg32::Unsigned(15))));
     // round down to nearest multiple of 8
     instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rbx, Arg64::Unsigned(0xFF_FF_FF_FF_FF_FF_FF_F0))));
     instructions.push(Instr::And(BinArgs::ToReg(Reg::R15, Arg32::Reg(Reg::Rbx))));
-
-
+    */
     
     instructions.append(&mut compile_to_instrs_helper(e, Vec::new(), true));
     
