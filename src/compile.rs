@@ -13,7 +13,7 @@ use crate::span::Span1;
 use std::convert::TryInto;
 use std::collections::HashMap;
 
-
+const PRINT_STUFF:bool = true;
 
 
 fn usize_to_i32(x: usize) -> i32 {
@@ -262,7 +262,7 @@ where
             let mut new_vars: HashSet<&String> = HashSet::new();
             for s in parameters {
                 if new_vars.contains(s) {
-                    return (Err(CompileErr::DuplicateBinding {
+                    return (Err(CompileErr::DuplicateArgName {
                         duplicated_name: s.to_string(),
                         location: ann.clone(),
                     }), funs);
@@ -282,9 +282,10 @@ where
 
 
 fn print_helper_decls<'a>(defs: &Vec<FunDecl<Exp<u32>, u32>>) -> String {
-    let mut out = "".to_string();
+    let mut out = "Def:".to_string();
+    
     for x in defs{
-        out += &format!("\n{}({}) body:\n{}",x.name,x.parameters.join(", "), print_helper(&x.body));
+        out += &format!("\n{}({}):\n{}",x.name,x.parameters.join(", "), print_helper(&x.body));
     }
     return out;
 }
@@ -293,43 +294,43 @@ fn print_helper<'a>(e: &'a Exp<u32>) -> String {
     let mut out = "".to_string();
     match e{
         Exp::Num(x, a) => {
-            out += &format!("Num({})",x);
+            out += &format!("{}",x);
         },
         Exp::Bool(x, a) => {
-            out += &format!("Bool({})",x);           
+            out += &format!("{}",x);           
         },
         Exp::Var(x, a) => {
-            out += &format!("Var({})",x);
+            out += &format!("{}",x);
         },
         Exp::Prim1(p, x, a) => {
-            out += &format!("Prim1(Prim1::");
+            //out += &format!("Prim1(Prim1::");
             match p{
-                Prim1::Add1 => {out += &format!("Add1({}))", print_helper(x));},
-                Prim1::Sub1 => {out += &format!("Sub1({}))", print_helper(x));},
-                Prim1::Not => {out += &format!("Not({}))", print_helper(x));},
-                Prim1::Print => {out += &format!("Print({}))", print_helper(x));},
-                Prim1::IsBool => {out += &format!("IsBool({}))", print_helper(x));},
-                Prim1::IsNum => {out += &format!("IsNum({}))", print_helper(x));},
-                Prim1::Length => {out += &format!("Length({}))", print_helper(x));},
-                Prim1::IsArray => {out += &format!("IsArray({})", print_helper(x));},
-                Prim1::IsFun => {out += &format!("IsFun({}))", print_helper(x));}, 
+                Prim1::Add1 => {out += &format!("add1({})", print_helper(x));},
+                Prim1::Sub1 => {out += &format!("sub1({})", print_helper(x));},
+                Prim1::Not => {out += &format!("!({})", print_helper(x));},
+                Prim1::Print => {out += &format!("print({})", print_helper(x));},
+                Prim1::IsBool => {out += &format!("isbool({})", print_helper(x));},
+                Prim1::IsNum => {out += &format!("Isnum({})", print_helper(x));},
+                Prim1::Length => {out += &format!("length({})", print_helper(x));},
+                Prim1::IsArray => {out += &format!("isarray({})", print_helper(x));},
+                Prim1::IsFun => {out += &format!("ssfun({})", print_helper(x));}, 
             }
         },
         Exp::Prim2(p, e1, e2, a) => {
-            out += &format!("Prim2(Prim2::");
+            //out += &format!("Prim2(Prim2::");
             match p{
-                Prim2::Add => {out += &format!("Add({},{}))", print_helper(e1), print_helper(e2));},
-                Prim2::Sub => {out += &format!("Sub({},{})", print_helper(e1), print_helper(e2));},
-                Prim2::Mul => {out += &format!("Mul({},{}))", print_helper(e1), print_helper(e2));},
-                Prim2::And => {out += &format!("And({},{}))", print_helper(e1), print_helper(e2));},
-                Prim2::Or => {out += &format!("Or({},{}))", print_helper(e1), print_helper(e2));},
-                Prim2::Lt => {out += &format!("Lt({},{})", print_helper(e1), print_helper(e2));},
-                Prim2::Gt => {out += &format!("Gt({},{}))", print_helper(e1), print_helper(e2));},
-                Prim2::Le => {out += &format!("Le({},{}))", print_helper(e1), print_helper(e2));},
-                Prim2::Ge => {out += &format!("Ge({},{}))", print_helper(e1), print_helper(e2));},
-                Prim2::Eq => {out += &format!("Eq({},{}))", print_helper(e1), print_helper(e2));},
-                Prim2::Neq => {out += &format!("Neq({},{}))", print_helper(e1), print_helper(e2));},
-                Prim2::ArrayGet => {out += &format!("ArrayGet({},{}))", print_helper(e1), print_helper(e2));}
+                Prim2::Add => {out += &format!("({} + {})", print_helper(e1), print_helper(e2));},
+                Prim2::Sub => {out += &format!("({} - {})", print_helper(e1), print_helper(e2));},
+                Prim2::Mul => {out += &format!("({} * {})", print_helper(e1), print_helper(e2));},
+                Prim2::And => {out += &format!("({} && {})", print_helper(e1), print_helper(e2));},
+                Prim2::Or => {out += &format!("({} || {})", print_helper(e1), print_helper(e2));},
+                Prim2::Lt => {out += &format!("({} < {})", print_helper(e1), print_helper(e2));},
+                Prim2::Gt => {out += &format!("({} > {})", print_helper(e1), print_helper(e2));},
+                Prim2::Le => {out += &format!("({} <= {})", print_helper(e1), print_helper(e2));},
+                Prim2::Ge => {out += &format!("({} >= {})", print_helper(e1), print_helper(e2));},
+                Prim2::Eq => {out += &format!("({} == {})", print_helper(e1), print_helper(e2));},
+                Prim2::Neq => {out += &format!("({} != {})", print_helper(e1), print_helper(e2));},
+                Prim2::ArrayGet => {out += &format!("({}[{}])", print_helper(e1), print_helper(e2));}
             }
         },
         Exp::Let { bindings, body, ann } => {
@@ -338,44 +339,51 @@ fn print_helper<'a>(e: &'a Exp<u32>) -> String {
                 out += &format!("{} = {}, ", b.0, print_helper(&b.1));
             }
             out = out[..out.len()-2].to_string();
-            out += &format!(" in {}", print_helper(body));
+            out += &format!(" in \n{}", print_helper(body));
         },
         Exp::If { cond, thn, els, ann } => {
-            out+= &format!("If{{ cond: {}, thn: {}, els: {} }}", 
+            out+= &format!("if ({}): {} else: {}", 
         print_helper(cond), print_helper(thn), print_helper(els));
         }
         Exp::FunDefs { decls, body, ann } => {
-            out += "FunDefs {{ vec![";
-            let mut tmp = "".to_string();
+            //out += "FunDefs {{ vec![";
+            let mut decls_vec = Vec::new();
+            let mut decls_str = "def ".to_string();
             for x in decls{
-                out += &format!("FunDecl{{name: {}, body: {}, ann: {} }}", x.name, print_helper(&x.body), x.ann);
-            } 
-            out += &format!("], body: {}, ann: {} }}", print_helper(body), ann);
+                let params = x.parameters.join(", ");
+                decls_vec.push(format!("{}({}): {}", x.name, params, print_helper(&x.body)));
+            }
+            decls_str += &format!("{}", decls_vec.join("\nand ")).to_string();
+            out += &format!("{}\nin {}", decls_str, print_helper(body));
         },
         Exp::Call(s, a, ann) => {
-            out+= &format!("Call({}, vec![", print_helper(s));
+            out+= &format!("{}(", print_helper(s));
+            let mut params_vec = Vec::new();
             for x in a{
-                out+=&format!("{},", print_helper(x));
+                params_vec.push(format!("{}", print_helper(x)));
             }
-            out += "])";
+            out += &format!("{})", params_vec.join(", ")).to_string();
         }
         Exp::Array(vec, ann) => {
-            let mut tmp = "".to_string();
+            let mut tmp = Vec::new();
             for x in vec{
-                tmp += &print_helper(x);
-                tmp += ", ";
+                tmp.push(print_helper(x));
             }
-            out += &format!("Array( vec![{}], ann: {})", tmp, ann);
+            out += &format!("[{}]",tmp.join(", "));
         }
         Exp::ArraySet{array, index, new_value, ann} => {
-            out += &format!("ArraySet{{array: {}, index: {}, new_value: {}, ann: {}}}",
-             print_helper(array), print_helper(index), print_helper(new_value), ann);
+            out += &format!("{}[{}] := {}",
+                print_helper(array), print_helper(index), print_helper(new_value));
         }
         Exp::Semicolon{e1, e2, ann} => {
-            out += &format!("Semicolon{{e1: {}, e2: {}, ann: {}}}", print_helper(e1), print_helper(e2), ann);
+            out += &format!("{};\n{}", print_helper(e1), print_helper(e2));
         }
         Exp::Lambda{parameters, body, ann} => {
-            out += &format!("Lambda{{parameters: vec![{}], body: {}, ann: {}}}", parameters.join(", "), print_helper(body), ann);
+            if parameters.len() != 0 {
+                out += &format!("(lambda({}): {})", parameters.join(", "), print_helper(body));
+            } else {
+                out += &format!("(lambda: {})", print_helper(body));
+            }
         }
         Exp::MakeClosure{arity, label, env, ann} => {
             out += &format!("MakeClosure{{arity: {}, label: {}, env: {}, ann: {}}}", arity, label, print_helper(env), ann);
@@ -1022,17 +1030,19 @@ fn uni_helper(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
         Exp::FunDefs { decls, body, ann } => {
             let mut new_decls:Vec<FunDecl<Exp<u32>, u32>> = Vec::new();
             let old_vars = new_vars.clone();
-            for curr_decl in decls{
+            for curr_decl in decls.clone(){
                 // for each function declaration, give the funcion a new name
                 let new_func_name = format!("Fun_{}", count.1);
                 count.1 += 1;
                 new_funs.insert(curr_decl.name.to_string(), new_func_name.to_string());
-
+            }
+            for curr_decl in decls.clone(){
                 // treat each argument like a let statement with no bindings, renaming the argument and adding to new_vars
                 // save the new parameters for later Exp::FunDefs
                 let mut new_parameters:Vec<String> = Vec::new();
+                let new_func_name = new_funs.get(&curr_decl.name).unwrap().to_string();
                 for curr_parameter in curr_decl.parameters.clone() {
-                    let new_parameter_name = format!("Fun_{}_param_{}_previous_param_{}", curr_decl.name.to_string(),count.0, curr_parameter);
+                    let new_parameter_name = format!("{}_param_{}_previous_param_{}", new_func_name, count.0, curr_parameter);
                     count.0 +=1;
                     new_vars.insert(curr_parameter, new_parameter_name.to_string());
                     new_parameters.push(new_parameter_name);
@@ -1114,33 +1124,34 @@ fn uni_helper(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
 }
 
 fn uni_helper2(e: &Exp<u32>, mut new_vars: HashMap<String,String>, 
-    mut new_funs: HashMap<String,String>, mut count: (usize, usize) )
+    mut new_funs: HashMap<String,String>, mut count: (usize, usize), is_call:bool)
  -> (Exp<()>, HashMap<String,String>){
     match e {
         Exp::Num(value, _) => {return (Exp::Num(*value,()), new_funs);},
         Exp::Bool(x, _) => {return (Exp::Bool(*x, ()), new_funs);},
         Exp::Var(s, _) => {
             let x;
-            if new_funs.get(s).is_some() {
+            if is_call && new_funs.get(s).is_some() {
                 x = new_funs.get(s).unwrap().to_string();
-                //println!("uni2 var {} -> {}", s, x);
-            }
-            else {
+            } else if new_vars.get(s).is_some(){
                 x = new_vars.get(s).unwrap().to_string();
-                //println!("uni2 var {} -> {}", s, x);
+            } else if new_funs.get(s).is_some() {
+                x = new_funs.get(s).unwrap().to_string();
+            } else {
+                panic!("uni_helper2 neither new_funs nor new_vars contains {}", s);
             }
             
             return (Exp::Var(x, ()), new_funs);
         },
         Exp::Prim1(p, e, _) => {
             let mut exp;
-            (exp, new_funs) = uni_helper2(e, new_vars.clone(), new_funs, count);
+            (exp, new_funs) = uni_helper2(e, new_vars.clone(), new_funs, count, is_call);
             return (Exp::Prim1(*p, Box::new(exp), ()), new_funs);
         },
         Exp::Prim2(p, e1, e2, _) => {
             let mut exp1; let mut exp2;
-            (exp1, new_funs) = uni_helper2(e1, new_vars.clone(), new_funs, count);
-            (exp2, new_funs) = uni_helper2(e2, new_vars.clone(), new_funs, count);
+            (exp1, new_funs) = uni_helper2(e1, new_vars.clone(), new_funs, count, is_call);
+            (exp2, new_funs) = uni_helper2(e2, new_vars.clone(), new_funs, count, is_call);
             return (Exp::Prim2(*p, Box::new(exp1), Box::new(exp2), ()), new_funs);
         },
         Exp::Let { bindings, body, ann } => {
@@ -1148,21 +1159,21 @@ fn uni_helper2(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
             let old_vars = new_vars.clone();
             for binding in bindings {
                 let mut temp;
-                (temp, new_funs) = uni_helper2(&binding.1, new_vars.clone(),new_funs, count);
+                (temp, new_funs) = uni_helper2(&binding.1, new_vars.clone(),new_funs, count, is_call);
                 let new_name = format!("Var_{}", count.0);
                 count.0 +=1;
                 new_vars.insert(binding.0.to_string(), new_name.to_string());
                 new_bindings.push((new_name.to_string(), temp));
             }
             let mut new_body;
-            (new_body, new_funs) = uni_helper2(body, new_vars.clone(), new_funs, count);
+            (new_body, new_funs) = uni_helper2(body, new_vars.clone(), new_funs, count, is_call);
             return (Exp::Let { bindings: new_bindings, body: Box::new(new_body), ann: () }, new_funs);
         },
         Exp::If { cond, thn, els, ann } => {
             let mut c; let mut t; let mut e;
-            (c, new_funs) = uni_helper2(cond, new_vars.clone(), new_funs, count);
-            (t, new_funs) = uni_helper2(thn, new_vars.clone(), new_funs, count);
-            (e, new_funs) = uni_helper2(els, new_vars.clone(), new_funs, count);
+            (c, new_funs) = uni_helper2(cond, new_vars.clone(), new_funs, count, false);
+            (t, new_funs) = uni_helper2(thn, new_vars.clone(), new_funs, count, is_call);
+            (e, new_funs) = uni_helper2(els, new_vars.clone(), new_funs, count, is_call);
             return (Exp::If{cond: Box::new(c), 
                             thn: Box::new(t), 
                             els: Box::new(e),
@@ -1188,12 +1199,12 @@ fn uni_helper2(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
                 }
                 // rename all the varibles inside the body of current declaration
                 let temp_exp;
-                (temp_exp, new_funs) = uni_helper2(&curr_decl.body, new_vars.clone(), new_funs, count);
+                (temp_exp, new_funs) = uni_helper2(&curr_decl.body, new_vars.clone(), new_funs, count, is_call);
                 new_decls.push(FunDecl { name: new_func_name, parameters: new_parameters, body: temp_exp, ann: () });
             }
 
             let temp_exp;
-            (temp_exp, new_funs) = uni_helper2(body, old_vars.clone(), new_funs, count);
+            (temp_exp, new_funs) = uni_helper2(body, old_vars.clone(), new_funs, count, is_call);
             return (Exp::FunDefs{decls: new_decls,
                 body: Box::new(temp_exp),
                 ann: ()}, new_funs);
@@ -1216,11 +1227,11 @@ fn uni_helper2(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
                 _ => {panic!("uni_helper2 calling something not var");}
             }*/
             let new_e;
-            (new_e, new_funs) = uni_helper2(fun, new_vars.clone(), new_funs, count);
+            (new_e, new_funs) = uni_helper2(fun, new_vars.clone(), new_funs, count, true);
             let mut new_parameters:Vec<Exp<()>> = Vec::new();
             for cur_p in a{
                 let renamed_para;
-                (renamed_para, new_funs) = uni_helper2(cur_p, new_vars.clone(), new_funs, count);
+                (renamed_para, new_funs) = uni_helper2(cur_p, new_vars.clone(), new_funs, count, is_call);
                 new_parameters.push(renamed_para);
             }
             return (Exp::Call(Box::new(new_e), new_parameters, ()), new_funs);
@@ -1231,7 +1242,7 @@ fn uni_helper2(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
 
             for curr_exp in vec{
                 let mut x;
-                x = uni_helper2(curr_exp, new_vars.clone(), new_funs, count);
+                x = uni_helper2(curr_exp, new_vars.clone(), new_funs, count, is_call);
                 new_funs = x.1;
                 new_vec.push(x.0);
 
@@ -1241,9 +1252,9 @@ fn uni_helper2(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
         Exp::ArraySet{array, index, new_value, ann} => {
             //panic!("nyi:uni_helper arrayset");
             let (new_array, new_index, new_value2);
-            (new_array, new_funs) = uni_helper2(array, new_vars.clone(), new_funs, count);
-            (new_index, new_funs) = uni_helper2(index, new_vars.clone(), new_funs, count);
-            (new_value2, new_funs) = uni_helper2(new_value, new_vars.clone(), new_funs, count);
+            (new_array, new_funs) = uni_helper2(array, new_vars.clone(), new_funs, count, is_call);
+            (new_index, new_funs) = uni_helper2(index, new_vars.clone(), new_funs, count, is_call);
+            (new_value2, new_funs) = uni_helper2(new_value, new_vars.clone(), new_funs, count, is_call);
             return (Exp::ArraySet{ 
                 array: Box::new(new_array), 
                 index: Box::new(new_index), 
@@ -1252,8 +1263,8 @@ fn uni_helper2(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
         }
         Exp::Semicolon{e1, e2, ann} => {
             let (new_e1, new_e2);
-            (new_e1, new_funs) = uni_helper2(e1, new_vars.clone(), new_funs, count);
-            (new_e2, new_funs) = uni_helper2(e2, new_vars.clone(), new_funs, count);
+            (new_e1, new_funs) = uni_helper2(e1, new_vars.clone(), new_funs, count, is_call);
+            (new_e2, new_funs) = uni_helper2(e2, new_vars.clone(), new_funs, count, is_call);
             return (Exp::Semicolon { e1: Box::new(new_e1), e2: Box::new(new_e2), ann: (),},new_funs)
         }
         Exp::Lambda{parameters, body, ann} => {
@@ -1266,7 +1277,7 @@ fn uni_helper2(e: &Exp<u32>, mut new_vars: HashMap<String,String>,
                 }
             // rename all the varibles inside the body
             let new_body;
-            (new_body, new_funs) = uni_helper2(&body, new_vars.clone(), new_funs, count);
+            (new_body, new_funs) = uni_helper2(&body, new_vars.clone(), new_funs, count, is_call);
 
             return (Exp::Lambda{parameters: new_parameters, body: Box::new(new_body), ann: ()}, new_funs);
         }
@@ -1398,7 +1409,7 @@ fn uniquify(e: &Exp<u32>) -> Exp<()> {
                 var5
     */
     let (a, funs) = uni_helper(&e.clone(), HashMap::new(), HashMap::new(), (0,0));
-    if true {
+    if false && PRINT_STUFF {
         println!("uniquify stuff---------");
         print!("uni1 funs contains: [");
         for x in funs.clone() {
@@ -1409,7 +1420,7 @@ fn uniquify(e: &Exp<u32>) -> Exp<()> {
         println!("End uniquify stuff---------");
     }
 
-    let (a, funs) = uni_helper2(e, HashMap::new(), funs, (0,0));
+    let (a, funs) = uni_helper2(e, HashMap::new(), funs, (0,0), false);
     return a;
     //return uni_fix_calls(&a, funs);
 }
@@ -1485,7 +1496,7 @@ mod check_uniquify_test {
 
 
 //1 make hashtable of all variables in outer scope (excluding pre existing parameters)
-fn lift_create_hashmap<ann>(p: Exp<ann>, mut env: Vec<String>, mut func_param: HashMap<String, (usize,Vec<String>)>) 
+fn lift_create_hashmap<ann: Clone>(p: Exp<ann>, mut env: Vec<String>, mut func_param: HashMap<String, (usize,Vec<String>)>) 
 -> HashMap<String, (usize, Vec<String>)> {
     match p{
         Exp::Num(_, _) => return func_param,
@@ -1515,6 +1526,12 @@ fn lift_create_hashmap<ann>(p: Exp<ann>, mut env: Vec<String>, mut func_param: H
             return lift_create_hashmap(*els, env.clone(), func_param);
         },
         Exp::FunDefs { decls, body, ann } =>{
+            let mut vec_of_funs_in_current_delc = Vec::new();
+            for curr_decl in decls.clone(){
+                vec_of_funs_in_current_delc.push(curr_decl.name);
+            }
+            env.append(&mut vec_of_funs_in_current_delc);
+
             for curr_decl in decls{
                 func_param.insert(curr_decl.name, (curr_decl.parameters.len() ,env.clone()));
 
@@ -2234,8 +2251,10 @@ fn lift_part_3<ann: Clone + std::marker::Copy + std::fmt::Display>
             let fun_def_env = &func_env.get(&decls[0].name.to_string()).unwrap().1;
             let mut arr_vector = Vec::new();
             let mut i = 0;
+            let env_size_excluding_new_decls = fun_def_env.len() - decls.len();
+            // let x in def f1 and f2 in def f3 ... -> func_env = (f1: [x, f1, f2], f2: [x, f1, f2], f3: [x, f1, f2, f3])
             for curr_var in fun_def_env { // fun_env = ( f: (2, [x1,x2,x3,f,g]), g: (3, [x1,x2,x3,f,g]))
-                if (i < fun_def_env.len() - func_env.len()) {
+                if (i < env_size_excluding_new_decls) {
                     arr_vector.push(Exp::Var(curr_var.to_string(), ()));
                 } else {
                     arr_vector.push(Exp::Num(0, ()));
@@ -2247,26 +2266,29 @@ fn lift_part_3<ann: Clone + std::marker::Copy + std::fmt::Display>
             let mut new_body;
             (funs, new_body) = lift_part_3(funs, *body, func_env.clone());
 
-            let array_name = format!("Arr_{}", &decls[0].name.to_string());
+            let array_name = format!("Arr_{}", ann);
             let mut outer_let_bindings = vec![(array_name.to_string(), env_array)];
 
-            let mut i = fun_def_env.len() - func_env.len();
+            let mut i = env_size_excluding_new_decls;
+            // fun_def_env = [x, f1, f2, f3], env_size_excluding_new_decls = 3
+            let new_function_list = &fun_def_env[(env_size_excluding_new_decls)..];
+            // new_function_list = [f3]
 
-            let function_list = &fun_def_env[(fun_def_env.len() - func_env.len())..];
-
-            for curr_fun in function_list{
+            for curr_fun in new_function_list{
                 outer_let_bindings.push((format!("{}",curr_fun.to_string()), Exp::MakeClosure{
                     arity: func_env.get(curr_fun).unwrap().0,
                     label: curr_fun.to_string(),
-                    //env: Box::new(Exp::Var(format!("Arr_{}", curr_fun.to_string()), ())),
-                    env: Box::new(Exp::Var(array_name.to_string(), ())),
+                    env: Box::new(Exp::Var(format!("Arr_{}", ann), ())),
+                    //env: Box::new(Exp::Var(array_name.to_string(), ())),
                     ann: (),
                 }));
                 /*
                     let x = 1 in def foo1() 2 in def foo2() and def foo3() in 4
                     func_env = (foo1: (0, [x, foo1, foo2, foo3], ...
                 */
-                
+            }
+            for f in decls{
+                let curr_fun = f.name;
                 new_body = Exp::Semicolon { 
                     e1: Box::new(Exp::ArraySet { 
                         array: Box::new(Exp::Var(array_name.to_string(), ())), 
@@ -2360,29 +2382,31 @@ fn lambda_lift<Ann: Clone + std::marker::Copy + std::fmt::Display>(p: &Exp<Ann>)
     let mut fun_env = lift_create_hashmap(no_lambdas.clone(), Vec::new(), HashMap::new());
 
     // append ordered list of every function to each value in fun_Env
-    let mut vector_of_functions = Vec::new();
+  /*   let mut vector_of_functions = Vec::new();
     for fun in fun_env.clone(){
         vector_of_functions.push(fun.0);
     }
+    
     let mut newmap = HashMap::new();
     for fun in fun_env{
         let mut tmp = fun.1.1;
         tmp.append(&mut vector_of_functions.clone());
         newmap.insert(fun.0, (fun.1.0, tmp));
-    }
-    let fun_env = newmap;
+    }*/
+    //let fun_env = newmap;
 
-    /* ToDo: create 1 helper that:
+    /*  1 helper that:
         1. Replaces funDefs with Closures with a let inside to move the arraystuff back onto the stack
         2. lifts funDefs to vector that gets returned
         3. adds 1 parameter to function calls
 */
     let (a,b) = lift_part_3(Vec::new(), no_lambdas.clone(), fun_env.clone());
+    if false && PRINT_STUFF {
     print!("FunDecls (len={}) after lambda lift: [", a.len());
     for x in a.clone() {
         print!("{}",x.name);
     }
-    println!("]");
+    println!("]");}
     return (a,b);
     return lift_part_3(Vec::new(), no_lambdas.clone(), fun_env.clone());
 
@@ -2812,17 +2836,29 @@ fn sequentialize_helper(e: &Exp<u32>) -> SeqExp<()> {
                         ann: ()}),
                     ann: (),
                 };*/*/
-            let tmp;
+            //let tmp;
+            let mut out;
             match *function_name.clone(){
-                Exp::Var(s, _) => tmp = s,
-                _ => panic!(),
+                Exp::Var(s, _) => {
+                    out = SeqExp::CallClosure{
+                        fun: ImmExp::Var(s),
+                        args: new_para,
+                        ann: (),
+                    };
+                }
+                _ => {
+                    let call_fun_name = format!("call_fun_{}", ann);
+                    out = SeqExp::Let { 
+                        var: call_fun_name.to_string(), 
+                        bound_exp: Box::new(sequentialize_helper(&function_name.clone())), 
+                        body: Box::new(SeqExp::CallClosure{
+                            fun: ImmExp::Var(call_fun_name),
+                            args: new_para,
+                            ann: (),
+                            }), 
+                        ann: () }
+                }
             }
-
-            let mut out = SeqExp::CallClosure{
-                fun: ImmExp::Var(tmp),
-                args: new_para,
-                ann: (),
-            };
             
             // out = foo1(bleh1, bleh2, bleh3)
             // original parameters = a,b,c
@@ -3720,7 +3756,7 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
             
             //put function pointer at r15+1 (8)
             //env.index_of(label) -> where pointer is on stack
-            println!("compile makeclosure label = {}", label);
+            if PRINT_STUFF {println!("compile makeclosure label = {}", label);}
             instructions.append(&mut compile_to_instrs_helper(
                 &SeqExp::Imm(ImmExp::Var(label.to_string()), 0), env.clone(), is_tail));
             let memadr = MemRef{ reg: Reg::R15, offset: Offset::Constant(8) };
@@ -4049,15 +4085,14 @@ where
     // first check for errors
     check_prog(p)?;
     // then give all the variables unique names
-    
-    println!("\nBefore uniquify:\n{}", print_helper(&tag_exp(p)));
+    if PRINT_STUFF {println!("\nBefore uniquify:\n{}", print_helper(&tag_exp(p)));}
     let uniq_p = tag_exp(&uniquify(&tag_exp(p)));
-    println!("\nAfter uniquify:\n{}", print_helper(&uniq_p));
+    if PRINT_STUFF {println!("\nAfter uniquify:\n{}", print_helper(&uniq_p));}
     // lift definitions to the top level
     let (defs, main) = lambda_lift(&uniq_p);
     let (t_defs, t_main) = tag_prog(&defs, &main);
-    println!("\nAfter Lambda Lift:\n{}", print_helper(&t_main));
-    println!("Defintions:{}", print_helper_decls(&t_defs));
+    if PRINT_STUFF {println!("\nAfter Lambda Lift:\n{}", print_helper(&t_main));
+    println!("{}", print_helper_decls(&t_defs));}
     // then sequentialize
     let seq_p = tag_sprog(&sequentialize_program(&t_defs, &t_main));
     // then codegen

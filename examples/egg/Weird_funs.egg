@@ -1,0 +1,5 @@
+def f():
+    def g():
+        6
+    in g()
+in f
