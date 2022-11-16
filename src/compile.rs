@@ -2347,13 +2347,51 @@ fn index_bounds_err(reg_to_check: Reg, array_pointer: Reg) -> Vec<Instr> {
     return instructions;
 }
 
+fn garbage_collector_helper()  -> Vec<Instr> {
+    //move everything after (R15 + RBX) back by amount
+    let mut instructions = Vec::new();
+
+    instructions.push(Instr::Label("Garbage_removal".to_string()));
+    /* Logic: if thing at R15 + Rbx is not 0, move to R15 + Rbx
+     */
+
+    instructions.push(Instr::Jmp(JmpArg::Label("Garbage_removal".to_string())));
+    instructions.push(Instr::Ret);
+    return instructions;
+}
+
+fn garbage_collector(env_size: usize, args_size:usize) -> Vec<Instr> {
+    let mut instructions = Vec::new();
+/* 
+    let mut max_space_needed: u32 = space_needed(e) as u32; //wastes memory, but is safe
+    if max_space_needed % 2 == 0 { max_space_needed +=1; }
+    max_space_needed = max_space_needed * 8;
+
+    let i = args_size + 1;
+    // for each thing on the stack
+    while i < env_size {
+        // if thing is an array
+
+        //
+        
+        instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
+        // call rust function
+        instructions.push(Instr::Call(JmpArg::Label("Garbage_removal".to_string())));
+        // should be inc
+        instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
+
+    }*/
+    
+
+    return instructions;
+}
 
 // List of currently used registers:
 // RSP: Points to current instruction location on stackr14
 // RBP: heap pointer?
 // RDI, RSI, RDX, RCX, R8, and R9 are System V AMD64 ABI arguments (rust calls)
 // Rax: everywhere, used to compute and return
-// Rbx: overwritten by prim2, if, and prim1:not
+// Rbx: overwritten by prim2, if, and prim1:not, and garbage removal
 // R10: overwritten in non-tail calls for debugging only // could be removed
 // Rdi: error codes in rust calls
 // Rsi: error faulty value in rust calls
@@ -2980,31 +3018,14 @@ fn compile_to_instrs_helper(e: &SeqExp<u32>,  mut env: Vec<String>, mut is_tail:
                     let address_to_write = MemRef{reg: Reg::Rsp, offset: Offset::Constant(-8 * i)};
                     instructions.push(Instr::Mov(MovArgs::ToMem(address_to_write, Reg32::Reg(Reg::Rax))));
                 }
+                // Clean up heap
+                instructions.append(&mut garbage_collector(env.len(), args.len()));
+
                 // jump to function 
-                /*instructions.append(&mut compile_to_instrs_helper(
-                    &SeqExp::Imm(fun_closure.clone(), 0), env.clone(), is_tail)
-                );*/
-       //         instructions.append(&mut compile_to_instrs_helper(&SeqExp::Imm(fun_closure.clone(), 0), env.clone(), is_tail));
-       //         instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rax, Arg32::Unsigned(3))));
                 instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Mem(MemRef { reg: Reg::R13, offset: Offset::Constant(8) }))));
-                /*if (true) {
-                    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rdi, Arg64::Reg(Reg::Rax))));
-                    let mut max_space_needed = env.clone().len() as u32;
-                    if max_space_needed % 2 == 0{ max_space_needed +=1; }
-                    max_space_needed = max_space_needed * 8;
-    
-                    instructions.push(Instr::Sub(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
-                    instructions.push(Instr::Call(JmpArg::Label("print_snake_val".to_string())));
-                    instructions.push(Instr::Add(BinArgs::ToReg(Reg::Rsp, Arg32::Unsigned(max_space_needed))));
-                }*/
-                if (false) {
-                    instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Label("Fun_0".to_string()))));
-                    //instructions.push(Instr::Mov(MovArgs::ToReg(Reg::Rax, Arg64::Label(s.clone()))));
-                }
+                
                 instructions.push(Instr::Jmp(JmpArg::Reg(Reg::Rax)));
                 instructions.push(Instr::Jmp(JmpArg::Label("End".to_string())));
-        //        instructions.push(Instr::Jmp(JmpArg::Reg(Reg::Rax)));
-         //       instructions.push(Instr::Jmp(JmpArg::Label("Fun_0".to_string())));
             }
 
             else { //non-tail
@@ -3105,7 +3126,7 @@ fn compile_to_instr_functions(funcs:Vec<FunDecl<SeqExp<u32>, u32>>, e: &SeqExp<u
         instructions.push(Instr::Ret);
     }
 
-
+    instructions.append(&mut garbage_collector_helper());
 
     // error handling labels
     // call rust print error thing and book
