@@ -113,7 +113,7 @@ extern "sysv64" fn snake_error(rdi: u64, rsi: SnakeVal) {
     /* */
     // rdi: code
     // rsi: faulty number/bool
-    println!("getting to snake_error");
+    println!("getting to snake_error with rdi = {}", rdi);
     match rdi {
         0 => eprintln!("arithmetic expected a number: {}", sprint_snake_val(rsi, Vec::new())),
         1 => eprintln!("comparison expected a number: {}", sprint_snake_val(rsi, Vec::new())),
@@ -122,7 +122,7 @@ extern "sysv64" fn snake_error(rdi: u64, rsi: SnakeVal) {
         4 => eprintln!("logic expected a boolean"),
 
         5 => eprintln!("called a non-function: {}", sprint_snake_val(rsi, Vec::new())),
-        6 => eprintln!("wrong number of arguments: {}", sprint_snake_val(rsi, Vec::new())),
+        6 => eprintln!("wrong number of arguments"),
 
         7 => eprintln!("indexed into non-array: {}", sprint_snake_val(rsi, Vec::new())),
         8 => eprintln!("index not a number: {}", sprint_snake_val(rsi, Vec::new())),

@@ -1,3 +1,3 @@
 #!/bin/bash
 
-zip -r submission.zip Cargo.toml src/ examples/ tests/ runtime/
+zip -r submission.zip Cargo.toml src/ examples/ tests/ runtime/stub.rs

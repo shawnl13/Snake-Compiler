@@ -34,7 +34,7 @@ mk_test!(egg_even_odd, "egg/weird_even_odd.egg", "true");
 mk_test!(egg_print_array_simple, "egg/print_array.egg", "[4, false, [true, 3]]");
 mk_test!(egg_looped_array, "egg/looped_array.egg", "[0, <loop>]");
 mk_test!(egg_duplicate_name, "egg/duplicate_name.egg", "0");
-mk_test!(egg_duplicate_name_2, "egg/duplicate_name_2.egg", "0");
+mk_fail_test!(egg_duplicate_name_2, "egg/duplicate_name_2.egg", "called a non-function");
 
 
 mk_test!(egg_interesting, "interesting.egg", "8");
