@@ -24,12 +24,11 @@ macro_rules! mk_fail_test {
  */
 
 // egg eater tests
-//mk_test!(egg_piazza_central, "egg/piazza_central.egg", "6");
+mk_test!(egg_piazza_central, "egg/piazza_central.egg", "6");
 mk_test!(egg_simple_function, "egg/simple_fun.egg", "5");
 mk_test!(egg_chain_array_set, "egg/chain_array_set.egg", "5");
-mk_test!(egg_weird_funs, "egg/weird_funs.egg", "6");
+mk_test!(egg_weird_funs, "egg/weird_funs.egg", "<closure>");
 mk_test!(egg_even_odd, "egg/weird_even_odd.egg", "true");
-//mk_test!(diamondback_non_tail_fun, "dia/non_tail_fun.dia", "6");
 
 
 mk_test!(egg_print_array_simple, "egg/print_array.egg", "[4, false, [true, 3]]");
@@ -38,15 +37,15 @@ mk_test!(egg_duplicate_name, "egg/duplicate_name.egg", "0");
 mk_test!(egg_duplicate_name_2, "egg/duplicate_name_2.egg", "0");
 
 
-//mk_test!(egg_interesting, "interesting,egg", 42);
-//mk_test!(egg_apply_to_five, "egg/applyToFive.egg", "6");
+mk_test!(egg_interesting, "interesting.egg", "8");
+mk_test!(egg_apply_to_five, "egg/applyToFive.egg", "6");
 mk_test!(egg_tail, "egg/tail.egg", "2");
 mk_test!(egg_array_simple, "egg/array_simple.egg", "5");
 
 mk_test!(egg_chain_array_set_complicated, "egg/chain_array_set copy.egg", "0");
 mk_test!(egg_create_array, "egg/create_array.egg", "1");
 mk_test!(egg_len_simple, "egg/len_simple.egg", "2");
-//mk_test!(egg_weird_call, "egg/weird_call.egg", "2");
+mk_test!(egg_weird_call, "egg/weird_call.egg", "2");
 
 
 mk_test!(egg_recursive_arrays_interesting, "interesting.egg", "8");
@@ -54,7 +53,7 @@ mk_test!(egg_recursive_arrays_interesting, "interesting.egg", "8");
 
 //
 mk_fail_test!(egg_call_non_fun_err, "egg/call_bool_err.egg", "called a non-function");
-//mk_fail_test!(egg_arity_err, "egg/arity_err.egg", "wrong number of arguments");
+mk_fail_test!(egg_arity_err, "egg/arity_err.egg", "wrong number of arguments");
 
 mk_fail_test!(egg_index_non_array_err, "egg/index_non_array_err.egg", "indexed into non-array");
 mk_fail_test!(egg_index_not_number_err, "egg/index_not_number_err.egg", "index not a number");

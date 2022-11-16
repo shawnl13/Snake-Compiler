@@ -16,4 +16,4 @@ def even(x):
   else:
     evn(-1 * x)
 in
-even(240)
+even(24)
